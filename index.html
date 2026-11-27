@@ -1865,6 +1865,144 @@ addEventListener('beforeunload',e=>{if(P.done&&SERVER_URL&&obGet().length){e.pre
 flush();
 })();
 </script>
+
+<script>
+'use strict';
+/* ===== PART 7 : 인물 개선 — 옷·피부색·머리카락·성별·연령, 자원봉사자 민트 조끼, 바닥 그림자 =====
+   기존 person()의 이름과 사용법을 그대로 유지해 장면 배치·걷는 길·소품 위치가 바뀌지 않으며, 오류가 나면 기존 인물로 돌아간다. */
+(function(){
+if(typeof THREE==='undefined')return;
+const person0=person;
+const SKINS=[0xf1cfb3,0xeabf9c,0xdfac86,0xcf9771,0xb67b57,0x8d5a3c],SKIN_IX=[0,1,2,1,3,0,2,4,1,3,5,2];   // 자연스러운 피부색 6단계
+const HAIRC=[0x1c1714,0x2a1f19,0x1c1714,0x3a2a21,0x2a1f19,0x5b3e2b];
+const TOPS=[0x2f3e64,0xe6e2da,0xd5bf9f,0x6b7a4b,0x8a3b44,0x7fa7d6,0xd1a23d,0xe07a5f,0x44474f,0x3e6b55,0xa596c9,0xb5653a];
+const BOTS=[0x3d5a80,0x23252b,0xb59b72,0x6b7078,0x283149,0x5a4636],SHOES=[0xe8e8e8,0x1f2024,0x6b4a32,0x8b9099],PACKS=[0x3b82c4,0xe0a33a,0xc2464f,0x3e8a6b];
+const VEST=0x2fd3a8,STRIPE=0xeafff9,ELD=[0x9a7b62,0x8a7060],VOLC=[0x3df5c4,0xffb340];          // 어르신·자원봉사자를 알아보는 기존 색 값
+const FH=['long','ponytail','bob','short','bun'],MH=['short','buzz','short','bob'];
+const POSE={rest:[.04,.07,-.15],carry:[-.8,0,-.6],up:[-.9,0,-.3],fwd:[-.4,0,-.2],down:[-.04,.14,-.05],cane:[-.4,.05,-.7],phone:[-.35,-.3,-1.5]};  // [어깨 앞뒤, 어깨 바깥쪽, 팔꿈치]
+const MUTE=new THREE.Color(0x3a3e46),TC=new THREE.Color(),muted=h=>{TC.setHex(h).lerp(MUTE,.72).multiplyScalar(.85);return TC.getHex()};
+let G=null,SHM=null,vCount=0,vScene=null;
+
+/* 공용 도형 (모든 사람이 함께 써서 가볍게) */
+function geo(){if(G)return G;
+ G={leg:B(.12,.6,.14),shoe:B(.13,.08,.22),up:B(.085,.3,.095),fore:B(.075,.27,.085),hand:B(.07,.08,.07),
+  torsoM:CY(.17,.2,.72,7),torsoF:CY(.155,.19,.72,7),vest:CY(.185,.215,.5,7),stripe:CY(.19,.22,.05,7),skirt:CY(.19,.27,.36,8),
+  head:IC(.15,1),capS:new THREE.SphereGeometry(.163,10,6,0,Math.PI*2,0,Math.PI*.55),capB:new THREE.SphereGeometry(.17,10,6,0,Math.PI*2,0,Math.PI*.68),
+  capZ:new THREE.SphereGeometry(.158,10,5,0,Math.PI*2,0,Math.PI*.42),back:B(.27,.36,.08),tail:B(.07,.2,.07),knot:SP(.075,8),
+  phone:B(.075,.13,.015),pack:B(.27,.33,.13),cane:CY(.018,.018,.95,5),shadow:new THREE.CircleGeometry(.34,18)};
+ const t=canvasTex(64,64,x=>{const r=x.createRadialGradient(32,32,0,32,32,32);r.addColorStop(0,'rgba(0,0,0,.5)');r.addColorStop(.6,'rgba(0,0,0,.22)');r.addColorStop(1,'rgba(0,0,0,0)');x.fillStyle=r;x.fillRect(0,0,64,64)},true);
+ SHM=new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false});SHM.userData.keep=true;return G}
+
+/* 외모 정하기 : 무작위가 아니라 장면·순서로 정해 매번 같은 사람이 같은 모습으로 나온다 */
+function look(o,idx){if(vScene!==sceneN){vScene=sceneN;vCount=0}
+ const elder=ELD.indexOf(o.col)>=0,vol=!!o.still&&VOLC.indexOf(o.col)>=0,k=idx+(sceneN+2)*3,
+  f=elder?sceneN===-1:vol?(vCount++%2===1):idx%2===1,teen=!vol&&!elder&&!o.still&&idx%5===3;
+ return {f,elder,vol,teen,skin:SKINS[SKIN_IX[(k*5)%SKIN_IX.length]],
+  hair:elder?(f?'bun':'short'):(f?FH[(k*3)%FH.length]:MH[(k*7)%MH.length]),
+  hairC:elder?(f?0xd9d6d0:0x9c9c9c):HAIRC[(k*5+1)%HAIRC.length],
+  top:elder?(f?0x8c6f5b:0x6e7f6a):TOPS[(k*7+2)%TOPS.length],bot:elder?0x4c4f57:BOTS[(k*5+3)%BOTS.length],
+  skirt:f&&!elder&&!teen&&k%3===0,shoe:SHOES[(k*3+1)%SHOES.length],pack:PACKS[k%PACKS.length]}}
+
+function hair(n,L,gg){const hm=mat(L.hairC),y=.17,cap=q=>{const m=add(n,q,hm,0,y+.005,-.012);m.rotation.x=-.28};
+ cap(L.hair==='buzz'?gg.capZ:L.hair==='bob'?gg.capB:gg.capS);
+ if(L.hair==='long')add(n,gg.back,hm,0,y-.15,-.12);
+ else if(L.hair==='ponytail'){add(n,gg.knot,hm,0,y+.02,-.16);add(n,gg.tail,hm,0,y-.1,-.19)}
+ else if(L.hair==='bun')add(n,gg.knot,hm,0,y+.13,-.07)}
+
+/* 사람 만들기 : 기존과 같은 키·비율(소품 위치 호환), 앞쪽은 +Z */
+function build(p,o){const gg=geo(),idx=walkers.length,L=look(o,idx),g=new THREE.Group(),cloth=[];
+ const C=(m,h)=>{cloth.push([m,h,muted(h)]);return m};                                   // 옷: 복구 전에는 색을 뺀다
+ const legs=[];[-.085,.085].forEach(x=>{const h=new THREE.Group(),lc=L.skirt?0x2b2f3a:L.bot;h.position.set(x,.66,0);g.add(h);
+  C(add(h,gg.leg,lc,0,-.3,0),lc);add(h,gg.shoe,L.shoe,0,-.62,.035);legs.push(h)});
+ const body=C(add(g,L.f?gg.torsoF:gg.torsoM,L.top,0,1.03,0),L.top);
+ if(L.skirt)C(add(g,gg.skirt,L.bot,0,.57,0),L.bot);
+ if(L.vol){add(g,gg.vest,VEST,0,1.1,0);add(g,gg.stripe,STRIPE,0,1,0)}                   // 자원봉사자 민트 조끼
+ const arms=[-1,1].map(s=>{const sh=new THREE.Group(),el=new THREE.Group();sh.position.set(s*(L.f?.2:.215),1.33,0);g.add(sh);
+  C(add(sh,gg.up,L.top,0,-.15,0),L.top);el.position.y=-.3;sh.add(el);C(add(el,gg.fore,L.top,0,-.135,0),L.top);add(el,gg.hand,L.skin,0,-.3,0);return {sh,el,s}});
+ const neck=new THREE.Group();neck.position.y=1.4;g.add(neck);
+ const head=add(neck,gg.head,L.skin,0,.17,0);hair(neck,L,gg);
+ let phone,hasPhone=false;
+ if(!L.elder&&!o.still){phone=add(arms[0].el,gg.phone,kmat('phone',{color:0x9fe8ff,emissive:0x9fe8ff,emissiveIntensity:1.8}),0,-.33,.035);phone.rotation.x=-.9;hasPhone=true}
+ else{phone=new THREE.Object3D();neck.add(phone)}                                          // 기존 코드의 neck.remove(phone) 호환
+ if(L.teen)C(add(g,gg.pack,L.pack,0,1.08,-.2),L.pack);
+ let cane=null;if(L.elder){cane=add(g,gg.cane,0x6b4a32,.27,.48,.14);cane.rotation.x=.3}
+ const sd=new THREE.Mesh(gg.shadow,SHM);sd.rotation.x=-Math.PI/2;sd.position.y=.015;g.add(sd);
+ g.scale.setScalar(L.teen?.88:L.f?.96:1);
+ const w={g,legs,body,head,neck,phone,gm:mat(GRAY),on:null,t:o.t==null?.6:o.t,col:o.col||WCOL[idx%6],still:!!o.still,path:o.path,r:o.r,ph:0,sp:0,
+  v2:true,arms,cloth,hasPhone,L,cane,base:g.children.length,pose:null};
+ if(o.path){const q=o.path;w.sp=(o.v||1)/Math.hypot(q[2]-q[0],q[3]-q[1]);w.ph=Math.random()*2}
+ else if(o.r){w.sp=(o.v||1)/o.r*(o.dir||1);w.ph=Math.random()*6.283}
+ if(o.pos){g.position.set(o.pos[0],0,o.pos[1]);g.rotation.y=o.pos[2]||0}
+ p.add(g);walkers.push(w);return w}
+
+/* 들고 있는 소품(장면 코드가 나중에 붙인 것)을 보고 팔 자세를 정한다 */
+function initPose(w){const P=[null,null];let carry=false;
+ w.g.children.slice(w.base).forEach(c=>{if(!c.isMesh)return;const q=c.position;
+  if(Math.abs(q.x)<.12){if(q.y>.8&&q.z>.2)carry=true}else P[q.x<0?0:1]=q.y>.9?'up':q.z>.15?'fwd':'down'});
+ if(w.cane)P[1]='cane';
+ w.pose=carry?['carry','carry']:[P[0]||'rest',P[1]||'rest']}
+function aim(a,t,k){a.sh.rotation.x+=(t[0]-a.sh.rotation.x)*k;a.sh.rotation.z+=(t[1]*a.s-a.sh.rotation.z)*k;a.el.rotation.x+=(t[2]-a.el.rotation.x)*k}
+function move(w,tm,dt){w.ph+=dt*w.sp;let x,z,dx,dz;                                       // 기존 걷기 계산 그대로
+ if(w.path){const q=w.path,u=((w.ph%2)+2)%2,fw=u<1,f=fw?u:2-u;x=q[0]+(q[2]-q[0])*f;z=q[1]+(q[3]-q[1])*f;dx=(q[2]-q[0])*(fw?1:-1);dz=(q[3]-q[1])*(fw?1:-1)}
+ else{const a=w.ph,sg=w.sp<0?-1:1;x=Math.sin(a)*w.r;z=-Math.cos(a)*w.r;dx=Math.cos(a)*sg;dz=Math.sin(a)*sg}
+ const s=Math.sin(tm*7+w.ph*5);w.g.position.set(x,Math.abs(s)*.035,z);w.g.rotation.y=Math.atan2(dx,dz);w.legs[0].rotation.x=s*.55;w.legs[1].rotation.x=-s*.55;return s}
+function legacy(w,dt,tm){const on=PW.lv>=w.t-1e-4;                                        // 기존 인물(대체된 경우)용
+ if(on!==w.on){w.on=on;w.body.material=on?mat(w.col):w.gm;w.head.material=on?mat(SKIN):w.gm;w.legs.forEach(h=>{h.children[0].material=on?mat(0x2b3550):w.gm});w.phone.visible=!on}
+ w.neck.rotation.x+=((on?0:.6)-w.neck.rotation.x)*Math.min(1,dt*3);
+ if(w.still||!w.sp){w.g.position.y=Math.abs(Math.sin(tm*1.6+w.ph))*.02;return}move(w,tm,dt)}
+
+person=function(p,o){try{return build(p,o||{})}catch(e){console.warn('PART 7: 기존 인물로 대체합니다',e);return person0(p,o)}};
+updWalkers=function(dt,tm){for(const w of walkers){
+ if(!w.v2){legacy(w,dt,tm);continue}
+ const on=PW.lv>=w.t-1e-4,k=Math.min(1,dt*10);
+ if(on!==w.on){w.on=on;w.cloth.forEach(c=>{c[0].material=mat(on?c[1]:c[2])});w.phone.visible=w.hasPhone&&!on}
+ if(!w.pose)initPose(w);
+ const usePh=w.hasPhone&&!on;                                                             // 복구 전: 휴대폰을 보며 고개 숙임
+ w.neck.rotation.x+=((usePh?.55:w.L.elder?.18:0)-w.neck.rotation.x)*Math.min(1,dt*3);
+ if(w.still||!w.sp){w.g.position.y=Math.abs(Math.sin(tm*1.6+w.ph))*.02;aim(w.arms[0],POSE[w.pose[0]],k);aim(w.arms[1],POSE[w.pose[1]],k);continue}
+ const s=move(w,tm,dt);
+ aim(w.arms[0],usePh?POSE.phone:[-s*.45,.05,-.25],k);aim(w.arms[1],[s*(usePh?.22:.45),.05,-.25],k)}};
+if(GL&&world&&!$('start').classList.contains('hide')&&walkers.some(w=>!w.v2))buildScene(-1);   // 첫 화면이 이미 그려졌다면 새 인물로 다시 그림
+})();
+</script>
+
+<script>
+'use strict';
+/* ===== PART 8 : 작은 수정 — 최종 코드 한/영 안내, 깜빡임 안전(초당 3회 이하) ===== */
+(function(){
+/* 1) 최종 코드가 영문으로 입력되면 한/영 키 안내 */
+try{const ci=$('codeIn'),cm=$('cmsg'),HINT='영문으로 입력되고 있어요. 한/영 키를 눌러 한글로 바꾼 뒤 입력해 주세요.',latin=v=>/[A-Za-z]/.test(v);
+ ci.placeholder='한글 네 글자 입력';
+ ci.addEventListener('input',()=>{if(latin(ci.value))cm.textContent=HINT;else if(cm.textContent===HINT)cm.textContent=''});
+ $('codeForm').addEventListener('submit',()=>{if(!$('timer').classList.contains('stop')&&latin(ci.value))cm.textContent=HINT})}
+catch(e){console.warn('PART 8 한/영 안내',e)}
+if(typeof THREE==='undefined')return;
+/* 2) 깜빡임 안전 */
+try{
+ // (가) 조명이 켜질 때: 매 프레임 무작위 깜빡임 → 초당 약 1.7회의 부드러운 깜빡임
+ updPower=function(dt){const d=PW.tg-PW.lv;if(Math.abs(d)>1e-4){PW.lv+=Math.sign(d)*Math.min(Math.abs(d),dt*PW.rate);applyPal()}
+  const tm=performance.now()/1000;
+  for(const L of lamps){const want=PW.lv>=L.t-1e-4?1:0;
+   if(L.k!==want){L.k+=(want-L.k)*Math.min(1,dt*(want?2.8:6));if(Math.abs(want-L.k)<.02)L.k=want}
+   let kk=L.k;if(want&&kk<1&&!RM&&Math.sin(tm*11)>.55)kk*=.45;
+   if(Math.abs(kk-L.a)>.002){L.a=kk;lampApply(L,kk)}}};
+ // (나) 광고판: 깜빡임 간격 0.7초 이상, ‘움직임 줄이기’ 설정에서는 깜빡이지 않음
+ billboard=function(p,deg,r,y,w,h,tb,tr,t){const g=new THREE.Group();add(g,B(w+.4,h+.4,.3),0x1a1e26,0,y,-.22);add(g,B(.35,y-h/2,.35),0x2a2f3a,0,(y-h/2)/2,-.3);
+  const ta=bbTex(tb[0],tb[1],'#ff3d5a'),tb2=bbTex(tr[0],tr[1],'#3df5c4'),m=new THREE.MeshBasicMaterial({map:ta,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
+  add(g,new THREE.PlaneGeometry(w,h),m,0,y,0);let st=-1,nd=0,de=0;
+  anims.push(tm=>{const on=PW.lv>=t?1:0;if(on!==st){st=on;m.map=on?tb2:ta}
+   if(on){m.opacity=.95;return}
+   if(!RM&&tm>nd&&Math.random()<.03){de=tm+.09;nd=tm+.7+Math.random()*1.5}
+   m.opacity=tm<de?.3:.8-.05*Math.sin(tm*4)});
+  p.add(at(g,deg,r));return g};
+ // (다) 과거 영상 홀로그램·센터 상황판: 무작위로 꺼지는 효과를 부드러운 밝기 변화로 덮어씀(마지막에 실행되도록 맨 앞에 등록)
+ const bs1=buildScene;buildScene=function(n){bs1(n);if(!GL)return;const ms=[],scr=R.scr||[];
+  [R.past,R.replay].forEach(g=>{if(g)g.traverse(o=>{if(o.isMesh&&ms.indexOf(o.material)<0)ms.push(o.material)})});
+  if(ms.length||scr.length)anims.unshift(tm=>{ms.forEach(m=>{m.opacity=.44+.05*Math.sin(tm*3)});scr.forEach((s,i)=>{if(!s.lit)s.m.opacity=.42+.04*Math.sin(tm*2+i)})})};
+ if(GL&&world&&!$('start').classList.contains('hide'))buildScene(-1);                     // 첫 화면이 이미 그려졌다면 다시 그림
+}catch(e){console.warn('PART 8 깜빡임 안전',e)}
+})();
+</script> 
  
 </body>
 </html>
