@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#06070b">
+<title>동래구 기록 복구 프로젝트 : 미래 붕괴 도시</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+/*
+ DESIGN — "BLACKOUT CITY × RECORD RESTORE"
+ VOICE  : 붕괴 직전 스마트시티의 복구 단말기. 긴박하지만 친절하게.
+ IDEA   : 행동 기록을 복구할 때마다 창문·네온·홀로그램이 하나씩 다시 켜진다.
+ COLOUR : 붕괴 = 스모그(녹·주황·보라) + 경보 레드 / 복구 = 민트 홀로그램 + 따뜻한 창문빛
+ TYPE   : Chakra Petch(숫자·영문 HUD) + Noto Sans KR(본문)
+*/
+:root{
+ --bg:#06070b;--glass:rgba(8,12,20,.74);--glass2:rgba(10,14,24,.94);--line:rgba(150,215,255,.16);
+ --mint:#3df5c4;--mintA:rgba(61,245,196,.15);--red:#ff3d5a;--redA:rgba(255,61,90,.16);
+ --amber:#ffb340;--sky:#66ccff;--violet:#b9a1ff;--ink:#eaf1ff;--sub:#8e9ab4;
+ --mono:"Chakra Petch","Noto Sans KR",system-ui,sans-serif;
+ --sans:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+ --sb:env(safe-area-inset-bottom,0px);--st:env(safe-area-inset-top,0px)
+}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font:16px/1.55 var(--sans);user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:none}
+button,input{font:inherit;color:inherit}
+input{user-select:text;-webkit-user-select:text}
+.hide{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
+
+/* 3D 캔버스와 화면 효과 */
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;transition:filter .6s}
+#c.drag{cursor:grabbing}
+body.past #c{filter:sepia(.6) saturate(1.3) brightness(1.08)}
+#vig{position:fixed;inset:0;z-index:2;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 50%,rgba(0,0,0,.62) 100%)}
+#alarm{position:fixed;inset:0;z-index:3;pointer-events:none;background:radial-gradient(ellipse at center,transparent 38%,rgba(255,25,50,.5) 100%);animation:alarm 1.2s ease-in-out infinite}
+#scan{position:fixed;inset:0;z-index:7;pointer-events:none;opacity:.5;background:repeating-linear-gradient(180deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px)}
+#glitch{position:fixed;inset:0;z-index:19;pointer-events:none;opacity:0;mix-blend-mode:screen;background:linear-gradient(180deg,transparent 0 18%,rgba(61,245,196,.35) 18% 21%,transparent 21% 46%,rgba(255,61,90,.4) 46% 50%,transparent 50% 71%,rgba(255,255,255,.22) 71% 72.5%,transparent 72.5%)}
+#glitch.on{animation:gsweep .55s steps(6) 1}
+
+/* 오브젝트 이름표 */
+#labels{position:fixed;inset:0;z-index:4;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 11px 6px 9px;border:1px solid var(--mint);border-radius:2px;background:rgba(4,20,18,.84);color:var(--mint);font:700 13px/1.2 var(--sans);white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+.lbl::after{content:"";position:absolute;left:50%;bottom:-10px;width:1px;height:9px;background:currentColor;opacity:.7}
+.lbl i{flex:none;width:7px;height:7px;background:currentColor;transform:rotate(45deg)}
+.lbl b{display:none;margin-left:2px;padding:1px 5px;background:var(--mint);color:#032;font:700 10px var(--mono);letter-spacing:.1em}
+.lbl.next{animation:lpulse 1.4s infinite}.lbl.next b{display:inline}
+.lbl.lock{border-color:rgba(255,255,255,.22);color:rgba(230,236,255,.55);background:rgba(10,12,18,.72)}
+.lbl.lock i{background:none;border:1px solid currentColor}
+.lbl.done{border-color:rgba(61,245,196,.35);color:rgba(61,245,196,.75);background:rgba(4,20,18,.55)}
+.lbl.done i{transform:none;width:auto;height:auto;background:none;font-style:normal}
+.lbl.done i::before{content:"✓"}
+body.busy .lbl{pointer-events:none;opacity:.55}
+.tag{position:absolute;left:0;top:0;pointer-events:none;padding:5px 10px;border:1px solid var(--mint);background:rgba(3,18,16,.82);color:var(--mint);font:700 13px var(--sans);white-space:nowrap}
+.tag em{margin-right:6px;font:700 11px var(--mono);font-style:normal;opacity:.75}
+.tag.unk{border-color:var(--red);color:var(--red);background:rgba(30,4,8,.82);animation:blink 1s infinite}
+.arrow{position:fixed;top:50%;z-index:4;pointer-events:none;display:flex;align-items:center;gap:6px;transform:translateY(-50%);color:var(--mint);font:700 11px var(--mono);letter-spacing:.12em;animation:nudge 1s infinite}
+.arrow span{font-size:28px;line-height:1;text-shadow:0 0 12px rgba(61,245,196,.7)}
+#arrowL{left:10px}#arrowR{right:10px;flex-direction:row-reverse}
+#hint{position:fixed;left:50%;bottom:calc(20px + var(--sb));transform:translateX(-50%);z-index:4;pointer-events:none;padding:7px 16px;border:1px solid var(--line);border-radius:20px;background:rgba(0,0,0,.6);color:#d6deee;font-size:13px;white-space:nowrap}
+#rec{position:fixed;left:50%;top:calc(92px + var(--st));transform:translateX(-50%);z-index:6;pointer-events:none;display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--amber);background:rgba(40,24,6,.82);color:var(--amber);font:700 12px var(--mono);letter-spacing:.12em}
+#rec.live{border-color:var(--red);background:rgba(40,6,12,.82);color:var(--red)}
+#rec i{width:8px;height:8px;border-radius:50%;background:currentColor;animation:blink 1s infinite}
+
+/* HUD (AR 고글) */
+#hud{position:fixed;inset:0;z-index:5;pointer-events:none}
+.panel{position:absolute;background:var(--glass);border:1px solid var(--line);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.panel::before,.panel::after{content:"";position:absolute;width:9px;height:9px;border:2px solid var(--hc,var(--mint));pointer-events:none}
+.panel::before{left:-2px;top:-2px;border-right:0;border-bottom:0}
+.panel::after{right:-2px;bottom:-2px;border-left:0;border-top:0}
+body.alert .panel{--hc:var(--red)}
+.cap{display:block;color:var(--sub);font:600 10px/1.3 var(--mono);letter-spacing:.16em;text-transform:uppercase}
+#agent{left:14px;top:calc(14px + var(--st));padding:8px 14px 9px}
+#agent .row{display:flex;align-items:center;gap:7px;font:700 13px var(--mono);letter-spacing:.04em}
+#agent .dot{width:8px;height:8px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);animation:blink 1s infinite}
+#agent.on .dot{background:var(--mint);box-shadow:0 0 8px var(--mint);animation:none}
+#place{display:block;margin-top:3px;color:var(--sub);font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#timerBox{left:50%;top:calc(14px + var(--st));transform:translateX(-50%);padding:6px 20px 7px;text-align:center}
+#timer{font:700 30px/1.05 var(--mono);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+#timer.low{color:var(--red);animation:blink .8s infinite}
+#timer.stop{color:var(--mint)}
+#goal{left:50%;top:calc(88px + var(--st));transform:translateX(-50%);padding:6px 14px;color:var(--mint);font-size:13px;font-weight:700;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis}
+#goal small{margin-left:8px;color:var(--sub);font:600 11px var(--mono)}
+#prog{right:14px;top:calc(14px + var(--st));width:200px;padding:8px 12px 10px}
+#prog .row{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
+#pct{color:var(--mint);font:700 18px var(--mono)}
+#segs{display:flex;gap:2px;margin-top:7px}
+#segs i{flex:1;height:6px;background:rgba(255,255,255,.1)}
+#segs i:nth-child(5n){margin-right:3px}#segs i:last-child{margin-right:0}
+#segs i.on{background:var(--mint);box-shadow:0 0 6px rgba(61,245,196,.6)}
+#mute{position:absolute;right:14px;top:calc(84px + var(--st));width:38px;height:38px;display:grid;place-items:center;pointer-events:auto;cursor:pointer;border:1px solid var(--line);background:var(--glass);font-size:16px}
+#inv{left:14px;top:calc(86px + var(--st));width:200px;padding:10px 12px 12px}
+#items{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 10px;color:var(--sub);font-size:12px}
+.chip{padding:1px 7px;border:1px solid rgba(61,245,196,.45);background:var(--mintA);color:#c8fff0;font-size:12px}
+.chip.used{opacity:.4;text-decoration:line-through}.chip.flash{animation:pop .6s}
+#codes{display:flex;gap:6px;margin-top:6px}
+#codes span{width:32px;height:32px;display:grid;place-items:center;border:1px dashed rgba(255,255,255,.25);background:rgba(255,255,255,.05);color:var(--sub);font-size:15px;font-weight:900}
+#codes span.got{border:1px solid var(--red);background:var(--redA);color:#fff;box-shadow:0 0 10px rgba(255,61,90,.45);animation:pop .6s}
+
+/* 대화창 (통신 단말) */
+#dlg{position:fixed;left:50%;bottom:calc(14px + var(--sb));transform:translateX(-50%);z-index:8;width:min(920px,calc(100% - 24px));min-height:150px;padding:14px 26px 36px;cursor:pointer;background:var(--glass2);border:1px solid var(--line);border-left:3px solid var(--spk);box-shadow:0 14px 50px rgba(0,0,0,.55);--spk:var(--mint)}
+#dlg.S{--spk:var(--mint)}#dlg.S.W{--spk:var(--red)}#dlg.P{--spk:var(--amber)}#dlg.Y{--spk:var(--sky)}#dlg.V{--spk:var(--violet)}#dlg.N{--spk:#69728a}
+#who{display:inline-flex;align-items:center;gap:8px;margin-bottom:8px;padding:2px 10px;border:1px solid var(--spk);color:var(--spk);font:700 12px/1.6 var(--mono);letter-spacing:.12em}
+#dlg.N #who{display:none}
+#who .wave{display:none;align-items:flex-end;gap:2px;height:10px}
+#dlg.Y .wave,#dlg.V .wave{display:inline-flex}
+#who .wave i{width:2px;height:3px;background:currentColor;animation:wave .9s ease-in-out infinite}
+#who .wave i:nth-child(2){animation-delay:.15s}#who .wave i:nth-child(3){animation-delay:.3s}#who .wave i:nth-child(4){animation-delay:.45s}
+#txt{font-size:clamp(17px,2.15vw,21px);font-weight:700;line-height:1.62;white-space:pre-line}
+#dlg.N #txt{font-weight:500;font-style:italic;color:#cfd6e6}
+#txt .q{display:block;margin-top:6px;padding-left:12px;border-left:3px solid var(--mint);color:#c2fbeb}
+#tap{position:absolute;right:20px;bottom:10px;color:var(--sub);font:700 11px var(--mono);letter-spacing:.12em;animation:bob 1.2s infinite}
+
+/* 오버레이 · 카드 */
+.ov{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px}
+.dim{background:rgba(4,6,12,.72);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.card{position:relative;width:min(580px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:24px 24px 20px;background:linear-gradient(180deg,rgba(14,20,34,.98),rgba(8,11,19,.98));border:1px solid var(--line);box-shadow:0 24px 70px rgba(0,0,0,.6)}
+.card::before,.card::after{content:"";position:absolute;width:16px;height:16px;border:2px solid var(--mint)}
+.card::before{left:-2px;top:-2px;border-right:0;border-bottom:0}.card::after{right:-2px;bottom:-2px;border-left:0;border-top:0}
+.card h3{margin:0;color:var(--mint);font:700 11px var(--mono);letter-spacing:.16em}
+#qno{float:right;color:var(--sub)}
+.card h2{margin:8px 0 14px;font-size:clamp(18px,2.5vw,22px);line-height:1.45}
+.opt{display:flex;gap:10px;align-items:flex-start;width:100%;margin:8px 0;padding:13px 16px;min-height:50px;text-align:left;cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.035);font-size:16px;font-weight:500;line-height:1.45;transition:background .15s,border-color .15s}
+.opt .n{flex:none;margin-top:1px;color:var(--mint);font:700 14px var(--mono)}
+.opt:hover{background:var(--mintA);border-color:rgba(61,245,196,.55)}
+.opt.bad{pointer-events:none;border-color:var(--red);background:var(--redA);color:#ffc4cd}.opt.bad .n{color:var(--red)}
+.opt.good{border-color:var(--mint);background:rgba(61,245,196,.22)}
+.oxrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.oxrow .opt{justify-content:center;align-items:center;margin:0;min-height:110px;font:700 46px var(--mono)}
+.msg{min-height:22px;margin-top:8px;color:var(--red);font-size:14px;font-weight:700}
+.msg.ok{color:var(--mint)}
+.qfoot{margin-top:6px;color:var(--sub);font-size:12px}
+.shake{animation:shake .45s}
+.btn{display:inline-block;min-height:50px;padding:14px 32px;border:0;cursor:pointer;background:var(--mint);color:#02281c;font-size:17px;font-weight:900;clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px);transition:filter .15s,transform .15s}
+.btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn:disabled{opacity:.55;cursor:wait;transform:none}
+
+/* 시작 화면 */
+#start{z-index:30;background:linear-gradient(180deg,rgba(6,7,11,.1) 0%,rgba(6,7,11,.5) 45%,rgba(6,7,11,.93) 100%)}
+#start .in{max-width:640px;text-align:center}
+.tag0{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border:1px solid var(--red);background:rgba(40,4,10,.6);color:var(--red);font:700 12px var(--mono);letter-spacing:.12em;animation:blink 1.6s infinite}
+#start h1{margin:16px 0 4px;font-size:clamp(30px,6.4vw,54px);font-weight:900;line-height:1.12;text-shadow:0 4px 30px rgba(0,0,0,.7)}
+#start h1 small{display:block;margin-top:10px;color:var(--mint);font:700 clamp(13px,2.2vw,17px) var(--mono);letter-spacing:.35em}
+#start p{max-width:480px;margin:16px auto 22px;color:#d4dbea;text-shadow:0 2px 10px rgba(0,0,0,.85)}
+#start ul{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:0 0 26px;padding:0;list-style:none;font-size:13px}
+#start li{padding:5px 12px;border:1px solid var(--line);background:rgba(8,12,20,.72);color:#dfe6f3}
+.gl{position:relative;display:inline-block}
+.gl::before,.gl::after{content:attr(data-t);position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;pointer-events:none}
+.gl::before{color:var(--red);animation:gl1 3.2s infinite}.gl::after{color:var(--mint);animation:gl2 4.1s infinite}
+
+/* 챕터 전환 · 토스트 · 코드 · 종료 */
+#title{z-index:15;pointer-events:none;background:radial-gradient(ellipse at center,rgba(4,8,14,.9) 0%,rgba(4,8,14,.97) 70%)}
+#title .tt{text-align:center}
+#title b{display:block;color:var(--mint);font:700 14px var(--mono);letter-spacing:.4em}
+#title h2{margin:10px 0 8px;font-size:clamp(26px,5.2vw,46px);font-weight:900;line-height:1.2}
+#title p{margin:0;color:var(--sub);font:600 12px var(--mono);letter-spacing:.2em}
+#title .bar{width:min(320px,70vw);height:3px;margin:16px auto 0;overflow:hidden;background:rgba(255,255,255,.1)}
+#title .bar i{display:block;width:0;height:100%;background:var(--mint);animation:load 1.9s ease-out forwards}
+#title.show{animation:fadeio 2.75s forwards}
+#toast{position:fixed;left:50%;top:calc(130px + var(--st));transform:translateX(-50%);z-index:25;pointer-events:none;opacity:0;transition:opacity .3s;padding:8px 18px;background:var(--red);color:#fff;font:700 16px var(--mono);letter-spacing:.06em}
+#toast.ok{background:var(--mint);color:#032}#toast.show{opacity:1}
+#glyphs{display:flex;justify-content:center;gap:10px;margin:4px 0 14px}
+#glyphs span{width:54px;height:54px;display:grid;place-items:center;border:1px solid var(--red);background:var(--redA);font-size:26px;font-weight:900;box-shadow:0 0 16px rgba(255,61,90,.35)}
+#codeIn{width:100%;margin:4px 0;padding:14px;text-align:center;letter-spacing:.5em;font-size:24px;font-weight:900;border:2px solid rgba(255,255,255,.2);background:#0b0f19;color:#fff}
+#fail{z-index:40;text-align:center;background:rgba(10,1,4,.95)}
+#fail h1{margin:0;color:var(--red);font:700 clamp(40px,10vw,86px) var(--mono);letter-spacing:.06em;animation:glitchT 1.4s infinite}
+#fail p{margin:12px 0 28px;color:#e8b8c0}
+#end{z-index:40;background:linear-gradient(180deg,rgba(4,18,16,.15),rgba(4,12,14,.72) 55%,rgba(4,10,12,.94))}
+#end .in{max-width:600px;text-align:center}
+#end .k{color:var(--mint);font:700 12px var(--mono);letter-spacing:.2em}
+#end h1{margin:8px 0 6px;font-size:clamp(30px,6.6vw,54px);font-weight:900}
+#end .big{margin:6px 0 4px;padding-left:.3em;color:var(--mint);font-size:clamp(40px,9vw,74px);font-weight:900;letter-spacing:.3em;text-shadow:0 0 28px rgba(61,245,196,.55)}
+#end .sys{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 18px;max-width:440px;margin:18px auto;text-align:left;font-size:14px}
+#end .sys span{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--line)}
+#end .sys span::after{content:"ON";color:var(--mint);font:700 13px var(--mono)}
+#end p{color:#cfe9e0}#endStat{color:var(--sub)!important;font-size:14px}
+
+/* WebGL 미지원 → 목록형 화면 */
+body.nogl{background:radial-gradient(ellipse at 50% 20%,#2a1a1e,#06070b 70%)}
+body.nogl #c{display:none}
+body.nogl #labels{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:150px 16px 210px}
+body.nogl .lbl{position:relative;transform:none!important}
+body.nogl .lbl::after{display:none}
+
+@keyframes blink{50%{opacity:.35}}
+@keyframes lpulse{0%,100%{box-shadow:0 0 0 0 rgba(61,245,196,.55),0 4px 14px rgba(0,0,0,.45)}50%{box-shadow:0 0 0 8px rgba(61,245,196,0),0 4px 14px rgba(0,0,0,.45)}}
+@keyframes bob{50%{transform:translateY(3px)}}
+@keyframes nudge{50%{opacity:.35}}
+@keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
+@keyframes alarm{50%{opacity:.3}}
+@keyframes fadeio{0%{opacity:0}12%,82%{opacity:1}100%{opacity:0}}
+@keyframes load{to{width:100%}}
+@keyframes wave{0%,100%{height:3px}50%{height:10px}}
+@keyframes gsweep{0%{opacity:1;transform:translateY(-30%)}20%{transform:translateY(10%)}40%{transform:translateY(-12%) scaleY(1.4)}60%{transform:translateY(25%)}80%{opacity:.8;transform:translateY(-5%)}100%{opacity:0;transform:none}}
+@keyframes gl1{0%,90%,100%{opacity:0;transform:none}91%{opacity:.85;transform:translate(-4px,0);clip-path:inset(12% 0 64% 0)}93%{opacity:.85;transform:translate(3px,0);clip-path:inset(58% 0 18% 0)}95%{opacity:0}}
+@keyframes gl2{0%,86%,100%{opacity:0;transform:none}87%{opacity:.8;transform:translate(4px,0);clip-path:inset(40% 0 38% 0)}89%{opacity:.8;transform:translate(-3px,0);clip-path:inset(4% 0 80% 0)}91%{opacity:0}}
+@keyframes glitchT{0%,100%{transform:none;text-shadow:none}20%{transform:translateX(-3px);text-shadow:3px 0 var(--mint)}40%{transform:translateX(3px);text-shadow:-3px 0 var(--sky)}}
+
+@media (max-width:720px){
+ #agent{left:8px;top:calc(8px + var(--st));max-width:33vw;padding:6px 9px 7px}
+ #agent .row{font-size:11px}#place{font-size:11px}
+ #timerBox{top:calc(8px + var(--st));padding:5px 12px}#timer{font-size:22px}#timerBox .cap{font-size:9px}
+ #prog{right:8px;top:calc(8px + var(--st));width:30vw;padding:6px 9px 8px}
+ #prog .cap{font-size:9px;letter-spacing:.06em}#pct{font-size:14px}
+ #segs{gap:1px}#segs i{height:5px}#segs i:nth-child(5n){margin-right:2px}
+ #goal,#rec{top:calc(70px + var(--st))}#goal{font-size:12px;max-width:calc(100vw - 16px)}
+ #inv{left:8px;top:calc(108px + var(--st));width:auto;max-width:46vw;padding:7px 9px 9px}
+ #items{margin:4px 0 6px}.chip{padding:0 5px;font-size:11px}
+ #codes span{width:24px;height:24px;font-size:12px}
+ #mute{right:8px;top:calc(108px + var(--st));width:34px;height:34px}
+ #dlg{min-height:132px;padding:12px 16px 32px}#tap{right:14px}
+ .lbl{padding:5px 9px 5px 7px;font-size:12px}.arrow b{display:none}
+ #toast{top:calc(112px + var(--st))}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="3D 조사 화면"></canvas>
+<div id="vig"></div>
+<div id="alarm" class="hide"></div>
+<div id="labels"></div>
+<div id="arrowL" class="arrow hide"><span>◀</span><b>NEXT</b></div>
+<div id="arrowR" class="arrow hide"><span>▶</span><b>NEXT</b></div>
+<div id="hint" class="hide">드래그로 둘러보고, 이름표를 눌러 조사하세요</div>
+<div id="rec" class="hide"><i></i><b id="recTxt"></b></div>
+
+<div id="hud" class="hide">
+ <div id="agent" class="panel"><div class="row"><span class="dot"></span><span id="agentTxt">LINK CONNECTING…</span></div><span id="place">DONGNAE CITY</span></div>
+ <div id="timerBox" class="panel"><span class="cap">Recovery Time</span><div id="timer">40:00</div></div>
+ <div id="goal" class="panel hide"></div>
+ <div id="prog" class="panel"><div class="row"><span class="cap">행동 기록 복구율</span><b id="pct">0%</b></div><div id="segs"></div></div>
+ <button id="mute" type="button" aria-label="소리 끄기">🔊</button>
+ <div id="inv" class="panel"><span class="cap">Items</span><div id="items">없음</div><span class="cap">Codes</span><div id="codes"><span>?</span><span>?</span><span>?</span><span>?</span></div></div>
+</div>
+<div id="scan"></div>
+
+<div id="dlg" class="hide"><div id="who"><span id="whoName">SYSTEM</span><span class="wave"><i></i><i></i><i></i><i></i></span></div><div id="txt"></div><div id="tap">TAP ▼</div></div>
+<div id="sr" class="sr" aria-live="polite"></div>
+
+<div id="quiz" class="ov dim hide" role="dialog" aria-modal="true" aria-labelledby="qtext"><div class="card" id="qcard">
+ <h3>DECRYPT · <span id="qobj"></span><span id="qno"></span></h3><h2 id="qtext"></h2><div id="qopts"></div><div class="msg" id="qmsg"></div>
+ <div class="qfoot">오답 시 남은 시간 −0:30 · 키보드 1~4로 선택할 수 있어요</div></div></div>
+
+<div id="codeBox" class="ov dim hide" role="dialog" aria-modal="true"><div class="card" id="ccard" style="text-align:center">
+ <h3>CENTRAL ARCHIVE · FINAL KEY</h3><h2>복구한 코드를 하나의 단어로 입력하세요</h2><div id="glyphs"></div>
+ <form id="codeForm" autocomplete="off"><input id="codeIn" maxlength="12" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="네 글자 입력" aria-label="최종 코드"><div class="msg" id="cmsg"></div><button class="btn" type="submit">기록 입력</button></form></div></div>
+
+<div id="title" class="ov hide"><div class="tt"><b id="tch"></b><h2 id="tname"></h2><p id="tsub"></p><div class="bar"><i></i></div></div></div>
+<div id="glitch"></div>
+<div id="toast"></div>
+
+<div id="start" class="ov"><div class="in">
+ <div class="tag0">⚠ DONGNAE CITY SYSTEM · 도시 기능률 17%</div>
+ <h1><span class="gl" data-t="동래구 기록 복구 프로젝트">동래구 기록 복구 프로젝트</span><small>미래 붕괴 도시</small></h1>
+ <p>전력이 끊기고 시스템이 멈춘 미래의 동래구. 네 구역에 남은 과거의 <b>행동 기록</b>을 복구하고, 코드 네 글자를 찾아 도시를 다시 가동하세요.</p>
+ <ul><li>⏱ 제한시간 40분</li><li>4개 구역 · 20문제</li><li>오답 시 −30초</li><li>드래그로 둘러보기 · 탭으로 조사</li></ul>
+ <button class="btn" id="go" type="button" disabled>시스템 접속 중…</button>
+ <div id="loadErr" class="msg hide">3D 화면을 불러오지 못해 목록형 화면으로 진행합니다.</div>
+</div></div>
+
+<div id="fail" class="ov hide"><div><h1>SYSTEM FAILURE</h1><p>복구 가능 시간이 초과되었습니다.<br>동래구 도시 시스템이 붕괴했습니다.</p><button class="btn" id="retry1" type="button">시스템 재접속 시도</button></div></div>
+
+<div id="end" class="ov hide"><div class="in">
+ <div class="k">DONGNAE CITY SYSTEM · 복구율 100%</div>
+ <h1>동래구 정상화 완료</h1>
+ <div class="big">자원봉사</div>
+ <div class="sys"><span>공공 유지 기록</span><span>공동체 연결망</span><span>환경 관리 시스템</span><span>취약계층 지원망</span><span>재난 대응 보조망</span><span>안전 시스템</span></div>
+ <p>“보이지 않던 행동이 사라지자, 도시가 무너졌다.”<br>그리고 그 행동이 돌아오자, 도시가 다시 움직이기 시작했다.</p>
+ <p id="endStat"></p>
+ <button class="btn" id="retry2" type="button">다시 플레이</button>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+'use strict';
+/* ===== PART 2 : 시나리오 · 상태 · 사운드 · 진행 로직 (3D 없이도 동작) ===== */
+const $=id=>document.getElementById(id);
+const RM=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+const SPK={S:'SYSTEM',P:'조사요원',Y:'서연 · 통신',V:'음성 기록',N:''};
+
+/* ---------- 시나리오 (PDF 수정완료본 기준) ---------- */
+const PROLOGUE=[
+ {fx:'alarm'},
+ ['N','화면 암전.\n삐— 삐—\n붉은 경고등이 켜진다.'],
+ ['S','DONGNAE CITY SYSTEM\n도시 기능률 17%\n공공 유지 기록 78% 손실'],
+ ['S','공동체 연결망 OFF\n환경 관리 시스템 OFF\n취약계층 지원망 OFF\n재난 대응 보조망 OFF'],
+ ['P','뭐야... 시스템이 전부 멈췄잖아.'],
+ {fx:'online'},
+ ['Y','조사요원, 들리세요?'],
+ ['P','들려요. 데이터 서버가 망가진 겁니까?'],
+ ['Y','처음엔 저희도 그렇게 생각했어요.'],
+ ['N','잠시 정적.'],
+ ['Y','그런데 이상한 점이 있어요.'],
+ {fx:'past'},
+ ['N','화면에 과거의 동래구 기록 영상이 겹쳐진다.\n사람들이 함께 거리를 정비하고, 누군가를 돕고 있다.'],
+ {fx:'present'},
+ ['N','다시 현재.\n같은 장소를 사람들이 그냥 지나친다.'],
+ ['Y','과거에는 사람들이 함께 환경을 정비하고 누군가를 도왔는데, 지금은 같은 장소를 사람들이 그냥 지나치고 있잖아요.'],
+ ['Y','사라진 건 데이터만이 아니에요.'],
+ ['P','그럼 뭐죠?'],
+ ['Y','사람들이 하던 어떤 ‘행동’ 자체가 사라지고 있어요.'],
+ ['S','⚠ UNKNOWN BEHAVIOR DATA LOST\n행동 기록 복구 필요\n복구 가능 시간 40:00'],
+ {fx:'sites'},
+ ['Y','과거 기록이 남아 있는 네 곳을 찾았어요.\n동래읍성 · 동래시장 · 온천천 · UNKNOWN'],
+ ['Y','그곳에 남아 있는 기록을 복구하면 이 도시가 왜 이렇게 됐는지 알 수 있을 거예요.'],
+ {fx:'alarmOff'},
+ ['S','COUNTDOWN START'],
+ {fx:'timer'}
+];
+
+const CH=[
+{no:'CHAPTER 1',name:'동래읍성 : 사라진 ‘선택’',place:'동래읍성',sub:'SECTOR 01 · HERITAGE ZONE',
+ intro:[
+  ['N','무너진 동래읍성.\n쓰레기가 날리고 시설 일부가 파손되어 있지만 누구도 관리하지 않는다.'],
+  ['P','완전히 버려진 느낌이야.'],
+  ['Y','이곳은 원래 많은 사람이 오가고 함께 관리하던 공간이었어요.'],
+  ['P','관리하는 사람이 사라진 건가요?'],
+  ['Y','아뇨. 사람은 있어요.'],
+  ['N','멀리 사람들이 무너진 시설을 바라보고 그냥 지나간다.'],
+  ['Y','하지만 이제는 아무도 먼저 움직이지 않아요.'],
+  ['S','⚠ 행동 데이터 손실\n‘누군가 시키지 않아도 스스로 움직였던 행동’\n관련 기록을 복구하십시오.'],
+  ['Y','화면을 드래그해서 주변을 둘러보고, 이름표가 붙은 물건을 눌러 조사해 주세요.']],
+ objs:[
+ {id:'flag',name:'찢어진 깃발',
+  pre:[
+   ['S','낡은 깃발이다.\n희미한 문장이 남아 있다.\n>“누가 시켜서 한 일이 아니었다.”'],
+   ['P','시키지도 않았는데 왜 했던 거지?'],
+   ['Y','그게 우리가 찾아야 할 첫 번째 기록이에요.'],
+   ['S','오래된 깃발이 바람도 없는 공간에서 미세하게 흔들리고 있습니다.\n깃발에는 과거 동래읍성을 지키던 사람들의 표식이 남아 있습니다.'],
+   ['P','깃발이라면 그냥 장식품 아닌가?'],
+   ['Y','꼭 그렇지는 않을 거예요. 옛날에는 깃발 하나로 사람들에게 상황을 알리거나, 모일 장소를 알려주기도 했으니까요.'],
+   ['P','그러니까 이 깃발도 누군가에게 무언가를 알리기 위한 물건이었다는 거네.'],
+   ['S','깃발의 뒷면에서 희미한 문장이 발견되었습니다.\n「혼자 지키는 성은 오래 버티지 못한다.」'],
+   ['P','처음부터 사람을 모으는 게 목적이었던 건가?'],
+   ['Y','아마도요. 깃발이 가리키는 곳에서 첫 번째 기록을 찾아보세요.']],
+  q:['다음 중 자원봉사의 ‘자발성’을 가장 잘 설명한 것은?',['정해진 시간만 채우는 활동','요청받은 후 참여를 결정하는 경우','스스로 필요성을 느끼고 참여하는 활동','평가 기준에 맞추는 활동'],2],
+  post:[
+   ['S','행동 기록 복구 완료.\n>“필요하다고 생각했기 때문에 스스로 참여했다.”'],
+   {item:'선택의 기록'},
+   ['P','스스로 필요하다고 생각해서 움직였다고...?'],
+   ['Y','네. 지금은 사라진 행동이에요.']]},
+ {id:'stele',name:'금이 간 비석',
+  pre:[
+   ['P','비석에는 이름이 굉장히 많이 적혀 있는데?'],
+   ['Y','자세히 보세요. 이름만 있는 게 아니에요. 날짜와 함께 여러 행동에 대한 기록도 남아 있어요.'],
+   ['P','‘성벽 보수’, ‘식량 운반’, ‘부상자 지원’... 전부 사람들이 직접 했던 일이네.'],
+   ['S','기록 일부가 손상되어 있습니다.\n남아있는 문장만으로 원래의 내용을 복원해야 합니다.'],
+   ['P','누가 얼마나 큰 일을 했는지가 아니라, 뭘 했는지를 기록해 놓은 거구나.'],
+   ['Y','맞아요. 어쩌면 이곳에서 찾고 있는 기록도 유명한 사람들의 기록이 아닐 수 있어요.'],
+   ['P','평범한 사람들이 했던 행동?'],
+   ['Y','그 가능성을 기억해두세요.'],
+   ['S','비석에 기록 장치가 있다.'],
+   ['Y','아까 발견한 기록을 넣어보세요.'],
+   {use:'선택의 기록'},
+   {fx:'stele'},
+   ['N','비석이 빛난다.'],
+   ['S','>“시작하는 것만으로는 충분하지 않았다.”'],
+   ['P','그럼 뭐가 더 필요했던 거지?']],
+  q:['자원봉사자가 책임감을 가진 모습으로 가장 알맞은 것은?',['주어진 활동만 신속히 마무리한다.','맡은 역할을 끝까지 수행한다.','지시가 있을 때까지 기다린다.','활동시간에 늦어도 말하지 않는다.'],1],
+  post:[
+   ['S','추가 기록 복구.\n>“스스로 시작하고, 맡은 일은 끝까지 수행했다.”'],
+   ['P','선택하고... 책임지고.']]},
+ {id:'mapdoor',name:'돌문',
+  pre:[
+   ['S','돌문에 작은 문양이 새겨져 있습니다.\n문양은 현재의 동래구 지도와 비슷한 형태를 보입니다.'],
+   ['P','이게 동래의 옛 지도였던 건가?'],
+   ['Y','아마 그런 것 같아요. 그런데 이상하네요. 지도에 표시된 장소 중 몇 곳은 지금도 존재하고 있어요.'],
+   ['P','그러면 도시 자체가 완전히 사라진 건 아니네.'],
+   ['Y','네. 건물과 길은 남아있는데, 그곳에서 일어나던 무언가가 사라진 것일 수도 있어요.'],
+   ['P','건물이 아니라... 사람들이 하던 행동이?'],
+   {fx:'mapGlow'},
+   ['S','돌문에서 새로운 문장이 확인되었습니다.\n「장소가 남아 있어도, 그곳을 움직이던 손길이 사라지면 기록은 멈춘다.」'],
+   ['P','점점 우리가 찾아야 할 게 뭔지 알 것 같아.']],
+  q:['자원봉사자의 특성 중 ‘금전적 이익을 목적으로 하지 않는 것’을 의미하는 용어는?',['공익성','무보수성','지속성','자발성'],1],
+  post:[
+   ['S','과거 음성 기록 복구.\n>“대가가 있어서 움직인 것이 아니었다.”'],
+   ['P','명령도 없고, 돈을 받은 것도 아니고...'],
+   ['Y','그런데도 누군가는 움직였어요.']]},
+ {id:'chest',name:'잠긴 기록함',
+  pre:[
+   ['P','보물상자라니... 드디어 진짜 보물인가?'],
+   ['Y','지금까지 나온 것들을 생각하면 돈이나 보석은 아닐 것 같은데요.'],
+   ['P','하긴. 이 게임에서 보물을 찾은 것은 한 번도 없으니까.'],
+   ['S','상자에는 금화나 귀중품 대신 여러 장의 작은 종이가 들어 있습니다.'],
+   ['P','이건 사람 이름이네.'],
+   ['Y','그리고 옆에는 날짜와 활동 내용이 적혀 있어요.'],
+   ['P','성벽을 고친 사람, 물을 나른 사람, 길을 정리한 사람...'],
+   ['Y','서로 모르는 사람들이 같은 일을 했던 기록이에요.'],
+   ['P','그 사람들이 대가를 받고 한 일일지도 모르겠는데?'],
+   ['S','보물상자 마지막 부분에서 한 문장이 발견되었습니다.\n「가장 오래 남는 보물은 누군가를 위해 남긴 시간이다.」'],
+   ['N','화면에 이름과 주소가 깨진 상태로 나타난다.'],
+   ['P','사람들의 개인정보 같은데?'],
+   ['Y','과거 사람들은 누군가를 도우면서 알게 된 정보도 함부로 다루지 않았어요.']],
+  q:['봉사활동 중 알게 된 대상자의 사생활이나 개인정보를 외부에 유출하지 않아야 하는 봉사자의 의무는?',['품위유지 의무','비밀유지 의무','보고 의무','성실 의무'],1],
+  post:[
+   {fx:'chestOpen'},
+   ['S','🔓 기록함 OPEN'],
+   {item:'自 조각'},
+   ['P','한자가 적혀 있어요. ‘스스로 자(自)’.'],
+   ['Y','중요한 단서 같아요. 가지고 가세요.']]},
+ {id:'gate',name:'봉인된 돌문',
+  pre:[
+   ['P','이 문이 다음 장소로 이어지는 건가?'],
+   ['Y','아마도요. 지금까지 찾은 단서들을 보면 다음 기록은 사람들이 실제로 생활하던 곳에 있을 가능성이 높아요.'],
+   ['P','시장 같은 곳?'],
+   ['S','출입문에서 마지막 기록이 발견되었습니다.\n「성은 사람들이 지켰고, 마을은 사람들이 돌보았다.」'],
+   ['P','그렇다면 다음에는 사람들이 살아가던 공간을 찾아야겠네.'],
+   ['Y','맞아요. 하지만 기억하세요. 지금까지의 기록에는 공통점이 하나 있습니다.'],
+   ['P','서로 다른 사람들이 같은 공간을 위해 움직였다는 것.'],
+   ['Y','바로 그겁니다.'],
+   ['N','문 중앙에 조각 하나가 들어갈 공간이 있다.'],
+   {use:'自 조각'},
+   {fx:'socket'}],
+  q:['다음 중 봉사자가 해서는 안 되는 행동은?',['궁금한 점을 질문하는 행동','배우려는 자세로 임하는 태도','상대방을 존중하지 않는 언행','도움을 요청하는 행동'],2],
+  post:[
+   {fx:'doorOpen'},
+   ['N','돌문이 열린다.'],
+   ['S','동래읍성 행동 기록 복구 완료.'],
+   {code:'자'},
+   ['P','자...'],
+   ['Y','이 도시를 움직였던 사람들은 명령을 기다리지 않았어요.'],
+   ['P','필요한 일을 스스로 선택했어.'],
+   ['S','UNKNOWN BEHAVIOR 복구율 25%']]}
+ ]},
+{no:'CHAPTER 2',name:'동래시장 : 사라진 ‘관계’',place:'동래시장',sub:'SECTOR 02 · MARKET DISTRICT',
+ intro:[
+  ['N','시장에는 사람들이 있다.\n그런데 길에 쓰러진 물건을 아무도 줍지 않는다.\n짐을 들기 힘들어하는 사람이 있어도 모두 지나친다.'],
+  ['P','여긴 사람이 있잖아요.'],
+  ['Y','네.'],
+  ['P','그런데 왜 이렇게 엉망이죠?'],
+  ['Y','이곳에서는 이제 ‘내 일이 아닌 일’에는 아무도 움직이지 않아요.'],
+  ['S','공동체 연결률 : 3%\n⚠ 상호 도움 행동 기록 소실']],
+ objs:[
+ {id:'bin',name:'쓰러진 쓰레기통',
+  pre:[
+   ['P','자기 쓰레기가 아니니까 아무도 치우지 않는 건가...'],
+   ['P','첫 번째부터 쓰레기 봉투네.'],
+   ['Y','시장이라면 이상하지는 않지만... 저걸 보세요.'],
+   ['P','주변에 쓰레기가 너무 많아.'],
+   ['S','기록에는 과거 시장의 청소 활동이 정기적으로 이루어졌다고 표시되어 있습니다.'],
+   ['P','그런데 지금은 아무도 치우지 않은 것처럼 보이네.'],
+   ['Y','누군가 한 번 치우지 않았다고 해서 도시가 바로 무너지지는 않겠죠.'],
+   ['P','하지만 아무도 치우지 않으면?'],
+   ['Y','작은 문제가 쌓이고, 결국 모두가 불편해지겠죠.']],
+  q:['다음 중 자원봉사에 대한 설명으로 가장 알맞은 것은?',['나를 돋보이게 만드는 활동','기록을 남기기 위한 활동','사회에 필요한 일을 스스로 참여하는 활동','특별한 사람만 할 수 있는 일'],2],
+  post:[
+   {fx:'binUp'},
+   ['S','과거 기록 복구.\n>“내 일이 아니더라도 우리에게 필요한 일이면 움직였다.”'],
+   {item:'공동체 기록'},
+   ['P','‘나’의 일이 아니라 ‘우리’의 일이었던 거네.']]},
+ {id:'boxes',name:'쓰러진 상자',
+  pre:[
+   {use:'공동체 기록'},
+   {fx:'replay'},
+   ['N','과거 영상이 재생된다.\n여러 사람이 함께 상자를 옮기고 있다.'],
+   ['S','상자 안에서 오래된 물품 전달 기록이 발견되었습니다.'],
+   ['P','‘식료품 전달’, ‘의약품 전달’, ‘생필품 지원’...'],
+   ['Y','시장은 단순히 물건을 사고파는 곳만은 아니었던 것 같네요.'],
+   ['P','필요한 사람이 있으면 다른 사람이 물건을 건네주기도 했던 거구나.'],
+   ['S','일부 기록에는 금액이 기록되어 있지 않습니다.'],
+   ['P','돈을 주고받은 기록이 없다고?'],
+   ['Y','어쩌면 거래가 아니라 도움을 기록한 것일 수도 있겠네요.']],
+  q:['자원봉사의 가장 중요한 가치는 무엇일까?',['성과와 보상','결과 중심의 평가','나눔과 존중','비교와 경쟁'],2],
+  post:[{fx:'replayOff'},{item:'나눔 조각'}]},
+ {id:'board',name:'오래된 게시판',
+  pre:[
+   ['N','게시판에 사진 한 장이 남아 있다.\n도움을 주는 사람과 도움을 받은 사람이 함께 웃고 있다.'],
+   ['P','도움을 받은 사람만 좋아하는 게 아니네요.'],
+   ['Y','행동은 한쪽으로만 흐르지 않았어요.'],
+   ['P','게시판에 종이가 엄청 많이 붙어 있어.'],
+   ['Y','대부분 오래된 공지네요.'],
+   ['P','‘시장 청소 참여자 모집’, ‘어르신 이동 지원’, ‘행사 준비 도움 요청’...'],
+   ['S','게시물의 상당수가 사람들의 참여를 요청하는 내용입니다.'],
+   ['P','그런데 이상하다.'],
+   ['Y','뭐가요?'],
+   ['P','누가 참여했는지는 적혀 있는데, 누가 돈을 냈는지는 적혀 있지 않아.'],
+   ['Y','중요한 건 돈이 아니었던 거겠죠.'],
+   ['P','그럼... 사람들의 시간과 행동 자체가 기록이었던 거네.']],
+  q:['자원봉사활동을 통해 봉사자와 지역사회가 얻을 수 있는 변화로 가장 알맞은 것은?',['봉사자는 경험을 얻지만 지역사회는 쉽게 변하지 않는다.','봉사자와 지역사회가 서로 도움을 주고 함께 성장한다.','지역사회에 도움이 된다면 봉사자의 배움은 중요하지 않다.','봉사시간이 많을수록 자원봉사의 가치도 커진다.'],1],
+  post:[{fx:'board'},['S','공동체 연결률\n3% → 37%']]},
+ {id:'bulb',name:'빛을 잃은 전구',
+  pre:[
+   ['P','전구가 왜 여기 있는 거지?'],
+   ['Y','전구 옆을 보세요. 오래된 작업 기록이 있어요.'],
+   ['P','‘야간 시장 조명 점검.’'],
+   ['S','전기 시설 관리 담당자가 아닌 주민들도 조명 점검에 참여했던 기록이 있습니다.'],
+   ['P','전문가가 아닌 사람들도 같이 관리했다고?'],
+   ['Y','작은 일이라도 누군가 해야 하니까요.'],
+   ['P','한 사람이 모든 걸 하는 게 아니라, 여러 사람이 조금씩 맡았던 거네.']],
+  q:['자원봉사는 결과보다 과정과 태도가 중요하다.',['O','X'],0],
+  post:[
+   {fx:'bulb'},
+   ['N','빛을 잃었던 전구가 켜진다.'],
+   ['S','>“얼마나 많이 했는가보다\n>어떻게 함께했는가.”']]},
+ {id:'chair',name:'버려진 의자',
+  pre:[
+   ['P','의자가 하나 덩그러니 놓여 있네.'],
+   ['S','의자에 앉는 사람을 위한 안내문이 발견되었습니다.\n「잠시 쉬어가세요. 필요한 사람이 먼저 앉을 수 있도록 자리를 비워주세요.」'],
+   ['P','그냥 의자인데, 다른 사람을 배려하는 행동으로 이어지는 매개체가 될 수 있군.'],
+   ['Y','지금까지 발견한 기록도 비슷했죠.'],
+   ['P','청소하고, 물건을 나누고, 행사에 참여하고, 시설을 관리하고...'],
+   ['Y','전부 아주 작은 행동이에요.'],
+   ['P','그런데 그런 행동들이 모이면 도시 전체가 달라지는 거고.'],
+   ['S','의자 아래에서 다음 장소를 가리키는 기록이 발견되었습니다.']],
+  q:['다음 중 자원봉사의 의미와 가장 거리가 먼 것은?',['공동체를 위한 활동','사회 문제 해결 참여','개인의 이익을 우선하는 활동','이웃을 존중하는 행동'],2],
+  post:[
+   ['S','공동체 연결망 일부 복구.'],
+   {code:'원'},
+   ['S','현재 CODE\n자 / 원 / ? / ?'],
+   ['P','자... 원...'],
+   ['Y','두 글자가 연결됐네요.'],
+   ['P','자원?'],
+   ['Y','아직 판단하기엔 일러요.']]}
+ ]},
+{no:'CHAPTER 3',name:'온천천 : 사라진 ‘행동’',place:'온천천',sub:'SECTOR 03 · ONCHEON STREAM',
+ intro:[
+  ['N','온천천에 쓰레기가 쌓여 있다.\n산책로 일부가 훼손되어 있고 관리되지 않는다.'],
+  ['P','...이건 너무 심한데.'],
+  ['Y','환경 관리 기록이 사라진 이후의 모습이에요.'],
+  ['P','이것도 그 사람들이 했던 행동과 관련 있는 거예요?'],
+  ['Y','온천천에 남아 있는 과거 활동 데이터가 있어요.']],
+ objs:[
+ {id:'rock',name:'물가의 돌',
+  pre:[
+   {fx:'term'},
+   ['N','화면에 오래된 온라인 시스템이 나타난다.'],
+   ['S','활동 참여 시스템 발견.'],
+   ['P','이번에는 그냥 돌인데?'],
+   ['Y','그냥 돌처럼 보여도 주변을 한번 살펴보세요.'],
+   ['P','돌 주변에 물길이 정리되어 있네.'],
+   ['S','과거 기록에 하천 주변의 돌과 물길을 정리한 활동이 확인됩니다.'],
+   ['P','이것도 사람들이 직접 했던 거야?'],
+   ['Y','네. 눈에 잘 띄지 않는 일이지만 누군가는 해야 했겠죠.'],
+   ['P','우리가 찾던 기록은 계속 이런 것만 나오네.']],
+  q:['1365 자원봉사포털에서 봉사활동을 신청할 때 가장 바람직한 행동은?',['활동 제목만 보고 바로 신청한다.','여러 활동을 같은 시간에 신청한다.','활동 내용과 일시, 장소를 확인한다.','가족이나 친구의 계정으로 대신 신청한다.'],2],
+  post:[
+   ['S','신청 기록 복구.\n환경정화 활동 / 신청 24명'],
+   ['P','사람들이 직접 이런 활동을 찾아서 신청했어.']]},
+ {id:'tree',name:'오래된 나무',
+  pre:[
+   ['P','나무에도 기록이 남아있어?'],
+   ['S','나무의 식재 날짜와 관리 기록이 확인됩니다.'],
+   ['P','물을 주고, 주변을 정리하고, 상태를 확인했다는 내용이네.'],
+   ['Y','누군가 심는 것보다 중요한 건 계속 돌보는 일이기도 하죠.'],
+   ['P','한 번의 행동으로 끝나는 게 아니구나.'],
+   ['Y','도시도 마찬가지일 거예요.']],
+  q:['신청한 봉사활동에 갑자기 참여하기 어려워졌을 때 가장 바람직한 행동은?',['아무 연락 없이 참여하지 않는다.','친구에게 대신 참석해 달라고 한다.','활동 담당자에게 미리 알리고 취소 여부를 확인한다.','봉사시간이 필요할 때 다시 연락한다.'],2],
+  post:[{fx:'bloom'},['S','과거 활동 원칙 복구.\n>“참여는 선택이지만, 약속에는 책임이 따른다.”']]},
+ {id:'boat',name:'떠 있는 배',
+  pre:[
+   ['P','작은 배가 물 위에 떠 있어.'],
+   ['Y','배 안쪽을 확인해 보세요.'],
+   ['P','청소 도구가 들어 있어.'],
+   ['S','과거 온천천 정화 활동에서 사용되었던 도구로 확인됩니다.'],
+   ['P','설마 이걸 타고 쓰레기를 치운 거야?'],
+   ['Y','기록상으로는 그렇습니다.'],
+   ['P','시장에서 봤던 기록하고 똑같네.'],
+   ['Y','사람들이 자신의 공간을 직접 관리했다는 점에서요.']],
+  q:['다음 중 봉사활동 선택 기준으로 가장 적절한 것은?',['집에서 가장 먼 곳','가장 짧은 시간','시간·거리·내 관심을 고려한 활동','친구가 많은 활동'],2],
+  post:[
+   {fx:'actmap'},
+   ['N','지도에 여러 활동이 나타난다.\n환경 / 복지 / 문화 / 재난 / 안전 / 교육'],
+   ['P','한 가지 행동만 있었던 게 아니네.'],
+   ['Y','사람들은 자신에게 맞는 방식으로 도시 곳곳에 참여했어요.']]},
+ {id:'balloon',name:'풍선',
+  pre:[
+   ['N','오래된 현수막, 페트병, 폐품이 놓여 있다.'],
+   ['P','갑자기 풍선?'],
+   ['Y','주변에 행사 기록이 있는 것 같아요.'],
+   ['P','‘동래구자원봉사센터 「자원봉사 박람회」’'],
+   ['S','행사 준비, 안전 관리, 환경 정리 등에 참여한 사람들의 기록입니다.'],
+   ['P','행사를 즐기는 사람뿐 아니라 준비하는 사람들도 있었던 거네.'],
+   ['Y','그리고 행사가 끝난 뒤 정리하는 사람도 있었겠죠.'],
+   ['P','보이지 않는 사람이 많았겠네.'],
+   ['Y','바로 그 점이 중요해 보여요.']],
+  q:['버려지는 물건에 디자인이나 활용도를 더해 새로운 가치를 가진 제품으로 재생산하는 친환경 활동 방식은 무엇인가?',['탄소중립','탄소배출권','에코라이프','업사이클'],3],
+  post:[
+   {fx:'clean'},
+   ['N','화면 변화.\n쓰레기 더미 일부가 사라지고 온천천이 조금씩 복구된다.']]},
+ {id:'cloud',name:'구름 위 헤드폰',
+  pre:[
+   ['N','헤드폰을 클릭한다.'],
+   {fx:'cloudOn'},
+   ['V','누군가에게는 글자를 읽는 것도 다른 사람의 도움이 필요했습니다.'],
+   ['P','이제 구름까지 조사해야 하는 거야?'],
+   ['Y','구름 자체보다 그 아래를 보세요.'],
+   ['P','온천천 전체가 보이네.'],
+   ['S','지금까지 발견한 모든 기록이 하나의 문장으로 연결됩니다.\n「누군가에게는 작은 일이었지만, 누군가에게는 도시를 유지하는 일이었다.」'],
+   ['P','이제 알 것 같아.'],
+   ['Y','무엇을요?'],
+   ['P','우리가 찾고 있는 건 특정한 사건이나 물건이 아니야.'],
+   ['Y','그렇다면 무엇일까요?'],
+   ['P','사람들이 서로를 위해 했던 행동들.'],
+   ['S','새로운 위치 정보가 활성화되었습니다.\n다음 기록 위치: 자원봉사센터']],
+  q:['시각장애인이 안전하게 읽을 수 있도록 도서 텍스트를 입력하거나 안내하는 봉사는 어떤 분야인가?',['환경 보호 봉사','장애인 지원 봉사','재난 복구 봉사','농어촌 일손 돕기'],1],
+  post:[
+   {fx:'archive'},
+   ['N','갑자기 화면에 대량의 기록이 복구된다.'],
+   ['S','ARCHIVE RECOVERY\n환경정화 활동 · 취약계층 지원 · 장애인 지원\n재난복구 · 문화행사 지원 · 안전 활동 · 교육 활동'],
+   ['S','...\n공통 분류 검색 중\n...'],
+   ['S','분류명 : 「자원봉사」'],
+   ['N','잠시 정적.'],
+   ['P','잠깐.'],
+   ['P','자원... 봉사?'],
+   ['Y','찾았네요.'],
+   ['P','지금까지 우리가 찾은 행동들이 전부...'],
+   ['Y','네.'],
+   ['Y','과거에는 이 행동들을 ‘자원봉사’라고 불렀어요.'],
+   {code:'봉'},
+   ['S','현재 CODE\n자 / 원 / 봉 / ?'],
+   ['P','그럼 마지막 글자는...'],
+   {fx:'alarm'},
+   ['N','갑자기 경고음.'],
+   ['S','⚠ CENTRAL ARCHIVE DETECTED\n기록 발신지 확인.\n동래구자원봉사센터'],
+   {fx:'alarmOff'},
+   ['Y','마지막 장소가 나타났어요.']]}
+ ]},
+{no:'CHAPTER 4',name:'동래구자원봉사센터 : 사라진 ‘책임’',place:'동래구자원봉사센터',sub:'SECTOR 04 · CENTRAL ARCHIVE',
+ intro:[
+  ['N','센터 내부.\n컴퓨터와 기록물, 활동사진들이 멈춘 상태로 남아 있다.'],
+  ['P','여기가 중심이었군요.'],
+  ['Y','맞아요.'],
+  ['P','그럼 여기서 사람들에게 봉사하라고 지시했던 건가요?'],
+  ['Y','아니요.'],
+  ['P','그럼 센터는 무슨 일을 했죠?'],
+  ['Y','사람들의 마음만으로 모든 활동이 안전하게 이어질 수는 없었어요.'],
+  {fx:'screens'},
+  ['N','컴퓨터 화면이 켜진다.\n활동처 / 교육 / 안전 / 배치 / 기록 / 관리'],
+  ['Y','좋은 마음이 실제 행동으로 이어지고, 그 행동이 안전하게 지속될 수 있도록 연결하는 곳이 필요했어요.'],
+  ['P','그러니까 자원봉사는 그냥 좋은 일을 하는 게 아니었군.']],
+ objs:[
+ {id:'report',name:'사고보고서',
+  pre:[
+   ['P','책상 위에 보고서가 있어요. ‘봉사활동 중 사고 보고서’?'],
+   ['S','과거 활동 중 발생한 사고와 그 대응 과정이 기록되어 있습니다.'],
+   ['Y','넘어진 봉사자가 있었는데, 바로 담당자에게 알려서 응급처치를 받았다고 적혀 있네요.'],
+   ['P','혼자 참고 넘어갔으면 더 크게 다쳤을 수도 있겠어.'],
+   ['Y','그래서 사고가 났을 때 무엇을 먼저 해야 하는지가 중요해요.']],
+  q:['봉사활동 중 사고가 발생했을 때 가장 먼저 해야 할 일은?',['사진찍기','스스로 해결하기','담당자에게 알리기','그냥 넘어가기'],2],
+  post:[['S','사고 대응 체계 복구.\n>“혼자 해결하지 않는다.”']]},
+ {id:'poster',name:'안전교육 자료',
+  pre:[
+   ['P','교육 자료가 잔뜩 붙어 있네.'],
+   ['S','‘활동 전 안전교육’ 자료입니다.\n장갑 착용, 도구 사용법, 비상 연락처가 정리되어 있습니다.'],
+   ['Y','봉사활동을 시작하기 전에 모두 이 교육을 들었대요.'],
+   ['P','좋은 마음만 있으면 되는 줄 알았는데, 준비도 필요했구나.'],
+   ['Y','나를 먼저 지켜야 다른 사람도 도울 수 있으니까요.']],
+  q:['봉사활동 현장에서 자신의 안전과 타인의 안전을 위해 반드시 지켜야 하는 규칙은 무엇인가?',['행동 수칙','안전 수칙','비상 연락 수칙','시설 이용 수칙'],1],
+  post:[{fx:'lights'},['N','센터 조명이 하나씩 켜진다.']]},
+ {id:'sign',name:'경고 표시',
+  pre:[
+   ['P','노란 경고 표지판이 세워져 있어.'],
+   ['S','‘위험 구역 출입 금지 — 봉사자 안전 우선’'],
+   ['P','봉사하러 왔는데 출입 금지라니, 좀 아쉽지 않아?'],
+   ['Y','아무리 좋은 활동이라도 사람이 다치면 그건 도움이 될 수 없어요.']],
+  q:['봉사활동 중에는 안전보다 봉사가 더 중요하다.',['O','X'],1],
+  post:[
+   {fx:'safety'},
+   ['S','SAFETY SYSTEM ONLINE'],
+   ['P','안전이 먼저였기 때문에 오래 함께할 수 있었던 거네.'],
+   ['Y','맞아요. 안전하게 지속되는 것, 그것도 봉사의 일부예요.']]},
+ {id:'toolbox',name:'공구함',
+  pre:[
+   ['P','빨간 공구함이네. 처음 보는 도구도 있어.'],
+   ['S','공구함 안쪽에 ‘사용 전 담당자 확인 필수’ 메모가 붙어 있습니다.'],
+   ['P','그냥 써 보면 금방 알 것 같은데...'],
+   ['Y','잘못 쓰면 나도, 옆 사람도 다칠 수 있어요. 모르면 묻는 것도 책임이에요.']],
+  q:['봉사활동 중 사용 방법을 모르는 도구를 사용해야할 때 가장 올바른 행동은?',['다른 봉사자가 하는 모습을 보고 따라한다.','간단한 도구라면 먼저 사용해 본다.','담당자에게 사용 방법과 안전수칙을 확인한다.','활동이 늦어지지 않도록 서둘러 사용한다.'],2],
+  post:[['S','장비 관리 기록 복구.\n>“모르면 묻고, 확인한 뒤에 움직인다.”']]},
+ {id:'pledge',name:'활동 약속서',
+  pre:[
+   ['S','센터 중앙에 오래된 약속서가 놓여 있습니다.'],
+   ['P','‘나는 약속한 시간에 참여하고, 맡은 역할을 끝까지 다하겠습니다.’ ...서명이 수백 개야.'],
+   ['Y','센터는 명령하는 곳이 아니었어요. 사람들이 스스로 한 약속을 지킬 수 있도록 돕는 곳이었죠.'],
+   ['P','선택하고, 함께하고, 행동하고... 마지막은 책임이구나.']],
+  q:['자원봉사에서 ‘책임’에 대한 설명으로 옳은 것은?',['기록만 남기면 된다.','개인의 수행만 중요하다.','약속을 지키고 맡은 역할을 다하는 것.','책임을 느낄 필요는 없다.'],2],
+  post:[
+   {code:'사'},
+   ['S','코드 입력:'],
+   ['Y','이제 입력하세요.'],
+   ['P','...이건...'],
+   ['S','정답을 입력하세요.'],
+   {fx:'codeInput'}]}
+ ]}
+];
+
+const ENDING=[
+ ['S','정답 확인 완료.\n입력된 기록 — 「자원봉사」'],
+ {fx:'restore'},
+ ['Y','복구되고 있어요! 사라졌던 기록들이 하나씩 돌아오고 있어요.'],
+ ['P','...이 도시를 지탱하던 건, 결국 사람이었네.'],
+ ['Y','네. 누군가 먼저 나서고, 누군가를 돕고, 함께 움직였던 기록들.'],
+ ['S','복구율 100%.\n동래구 정상화 완료.'],
+ ['P','기록이 사라진 게 아니었어. 우리가 그 가치를 잊고 있었던 거야.'],
+ ['Y','이제 다시 시작할 수 있어요.'],
+ ['S','복구 작업을 종료합니다.'],
+ {fx:'end'}
+];
+
+/* ---------- 상태 ---------- */
+const TOTAL_Q=20,START_TIME=40*60,PENALTY=30;
+const S={ch:-1,next:0,solved:0,wrong:0,items:[],used:[],codes:[],time:START_TIME,running:false,busy:true,dlg:false,over:false};
+let GL=false;   // PART 3에서 WebGL 성공 시 true
+let objs=[];    // 현재 구역의 조사 대상 [{def, g, ...}]
+
+/* ---------- 사운드 (WebAudio 합성음, 파일 없음) ---------- */
+const AU={ctx:null,on:true,g:null};
+function auInit(){if(AU.ctx)return;try{const C=window.AudioContext||window.webkitAudioContext;if(!C)return;AU.ctx=new C();AU.g=AU.ctx.createGain();AU.g.gain.value=.32;AU.g.connect(AU.ctx.destination)}catch(e){AU.ctx=null}}
+function tone(f,d,type,v,t0,f2){const c=AU.ctx;if(!c||!AU.on)return;try{if(c.state==='suspended')c.resume();
+ const t=c.currentTime+(t0||0),o=c.createOscillator(),g=c.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);
+ if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(v||.2,t+.012);
+ g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(AU.g);o.start(t);o.stop(t+d+.05)}catch(e){}}
+const SFX={
+ alarm(){for(let i=0;i<3;i++){tone(880,.2,'square',.11,i*.55);tone(660,.2,'square',.11,i*.55+.24)}},
+ tick(){tone(1400,.035,'square',.03)},
+ ok(){tone(660,.12,'triangle',.25);tone(990,.16,'triangle',.25,.09);tone(1320,.3,'triangle',.22,.18)},
+ bad(){tone(150,.4,'sawtooth',.2,0,70)},
+ item(){tone(880,.08,'sine',.22);tone(1320,.16,'sine',.22,.08)},
+ code(){[523,659,784,1047].forEach((f,i)=>tone(f,.28,'triangle',.2,i*.09))},
+ power(){tone(55,1,'sawtooth',.13,0,220)},
+ glitch(){tone(300+Math.random()*500,.06,'square',.05);tone(80,.14,'sawtooth',.07,.04)},
+ open(){tone(90,1.2,'sine',.25,0,45)}
+};
+
+/* ---------- 공통 UI 유틸 ---------- */
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmtT(s){s=Math.max(0,Math.ceil(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')}
+function setBusy(b){S.busy=b;document.body.classList.toggle('busy',b)}
+function arm(el,ms){el.dataset.arm=String(performance.now()+(ms||400))}   // 모바일 고스트 클릭 방지
+function armed(el){return performance.now()>=+(el.dataset.arm||0)}
+function glitch(){const g=$('glitch');g.classList.remove('on');void g.offsetWidth;g.classList.add('on');SFX.glitch()}
+function toast(t,ok){const el=$('toast');el.textContent=t;el.className=ok?'ok show':'show';clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),1500)}
+function showRec(t,live){$('recTxt').textContent=t;$('rec').className=live?'live':''}
+function hideRec(){$('rec').className='hide'}
+let hintT=0;
+function showHint(){$('hint').classList.remove('hide');clearTimeout(hintT);hintT=setTimeout(hideHint,9000)}
+function hideHint(){$('hint').classList.add('hide')}
+
+/* ---------- 대화 엔진 ---------- */
+let dQ=[],dDone=null,dTyping=null,dFull='',dPlain='';
+function fmt(t){const parts=[];let buf=[],q=[];
+ const fT=()=>{if(buf.length){parts.push(esc(buf.join('\n')));buf=[]}};
+ const fQ=()=>{if(q.length){parts.push('<span class="q">'+q.map(esc).join('<br>')+'</span>');q=[]}};
+ t.split('\n').forEach(l=>{if(l.charAt(0)==='>'){fT();q.push(l.slice(1))}else{fQ();buf.push(l)}});fT();fQ();return parts.join('')}
+function run(lines,done){dQ=lines.slice();dDone=done||null;setBusy(true);step()}
+function step(){
+ while(dQ.length&&!Array.isArray(dQ[0])){const a=dQ.shift();
+  if(a.fx){const f=(typeof FX!=='undefined')&&FX[a.fx];if(f&&f(a)==='wait'){closeDlg();return}}
+  else if(a.item){addItem(a.item);dQ.unshift(['S','◆ 아이템 획득 : 「'+a.item+'」']);SFX.item()}
+  else if(a.use){useItem(a.use);dQ.unshift(['S','▶ 「'+a.use+'」 사용'])}
+  else if(a.code){addCode(a.code);dQ.unshift(['S','🔑 CODE [ '+a.code+' ] 복구']);SFX.code()}}
+ if(!dQ.length){closeDlg();const d=dDone;dDone=null;setBusy(false);if(d)d();return}
+ const ln=dQ.shift();openDlg(ln[0],ln[1]);
+}
+function openDlg(sp,t){S.dlg=true;const d=$('dlg');let c=sp;
+ if(sp==='S'&&/⚠|OFF|LOST|손실|소실|FAILURE|DETECTED/.test(t))c+=' W';
+ d.className=c;$('whoName').textContent=SPK[sp]||'';
+ dFull=fmt(t);dPlain=t.replace(/^>/gm,'');$('sr').textContent=(SPK[sp]?SPK[sp]+': ':'')+dPlain;
+ const tx=$('txt');clearInterval(dTyping);dTyping=null;if(RM){tx.innerHTML=dFull;return}
+ let n=0;tx.textContent='';
+ dTyping=setInterval(()=>{n+=2;if(n>=dPlain.length){clearInterval(dTyping);dTyping=null;tx.innerHTML=dFull}else tx.textContent=dPlain.slice(0,n)},22)}
+function closeDlg(){S.dlg=false;$('dlg').className='hide';clearInterval(dTyping);dTyping=null}
+function advance(){if(!S.dlg)return;if(dTyping){clearInterval(dTyping);dTyping=null;$('txt').innerHTML=dFull;return}SFX.tick();step()}
+$('dlg').addEventListener('click',e=>{e.stopPropagation();advance()});
+
+/* ---------- 인벤토리 · 코드 · 진행도 ---------- */
+(function(){let h='';for(let i=0;i<TOTAL_Q;i++)h+='<i></i>';$('segs').innerHTML=h})();
+function renderItems(){const el=$('items');el.innerHTML=S.items.length?S.items.map(n=>'<span class="chip'+(S.used.includes(n)?' used':'')+'">'+esc(n)+'</span>').join(''):'없음'}
+function addItem(n){if(!S.items.includes(n))S.items.push(n);renderItems();const c=$('items').lastElementChild;if(c)c.classList.add('flash')}
+function useItem(n){if(!S.used.includes(n))S.used.push(n);renderItems()}
+function addCode(c){S.codes.push(c);const sp=$('codes').children[S.codes.length-1];if(sp){sp.textContent=c;sp.classList.add('got')}}
+function setProg(){$('pct').textContent=Math.round(S.solved/TOTAL_Q*100)+'%';Array.prototype.forEach.call($('segs').children,(s,i)=>s.classList.toggle('on',i<S.solved))}
+function setGoal(){const o=objs[S.next],g=$('goal');
+ if(o){g.innerHTML='목표 · 「'+esc(o.def.name)+'」 조사<small>'+(S.next+1)+' / '+objs.length+'</small>';g.classList.remove('hide')}else g.classList.add('hide')}
+
+/* ---------- 조사 · 문제 ---------- */
+let quizObj=null;
+function tryObj(i){if(S.busy||S.over)return;const o=objs[i];if(!o)return;
+ if(i<S.next){run([['S','이미 복구된 기록입니다. 「'+o.def.name+'」']]);return}
+ if(i>S.next){run([['S','아직 이 기록에 접근할 수 없습니다.\n먼저 「'+objs[S.next].def.name+'」을(를) 조사하세요.']]);lookAtObj(S.next);return}
+ lookAtObj(i);hideHint();run(o.def.pre,()=>openQuiz(o))}
+function openQuiz(o){setBusy(true);quizObj=o;const q=o.def.q,ox=q[1].length===2&&q[1][0]==='O';
+ $('qobj').textContent=o.def.name;$('qno').textContent='Q'+String(S.solved+1).padStart(2,'0')+' / '+TOTAL_Q;$('qtext').textContent=q[0];
+ const m=$('qmsg');m.className='msg';m.textContent='';const box=$('qopts');box.className=ox?'oxrow':'';
+ box.innerHTML=q[1].map((t,k)=>'<button type="button" class="opt" data-k="'+k+'">'+(ox?'':'<span class="n">'+'①②③④'.charAt(k)+'</span>')+'<span>'+esc(t)+'</span></button>').join('');
+ const ov=$('quiz');ov.classList.remove('hide');arm(ov,380);
+ setTimeout(()=>{const f=box.querySelector('.opt');if(f)f.focus({preventScroll:true})},60)}
+$('qopts').addEventListener('click',e=>{const b=e.target.closest('.opt');if(b)answer(+b.dataset.k)});
+function answer(k){const o=quizObj,ov=$('quiz');if(!o||ov.classList.contains('hide')||!armed(ov))return;
+ const b=$('qopts').children[k];if(!b||b.classList.contains('bad'))return;
+ if(k===o.def.q[2]){quizObj=null;b.classList.add('good');const m=$('qmsg');m.className='msg ok';m.textContent='해독 성공 — 행동 기록을 복구합니다.';SFX.ok();
+  setTimeout(()=>{ov.classList.add('hide');S.solved++;setProg();S.next++;sceneSolved(S.next);refreshLabels();setGoal();run(o.def.post,afterObj)},750)}
+ else{b.classList.add('bad');S.wrong++;S.time=Math.max(0,S.time-PENALTY);updTimer();SFX.bad();
+  const m=$('qmsg');m.className='msg';m.textContent='기록 손상! 해독 실패 — 남은 시간 −0:30';
+  const c=$('qcard');c.classList.remove('shake');void c.offsetWidth;c.classList.add('shake');toast('−0:30');if(S.time<=0)fail()}}
+function afterObj(){if(S.next<objs.length){setGoal();return}$('goal').classList.add('hide');if(S.ch<CH.length-1){S.ch++;enterChapter()}}
+
+/* ---------- 챕터 전환 ---------- */
+function enterChapter(){const c=CH[S.ch];setBusy(true);S.next=0;$('goal').classList.add('hide');
+ $('tch').textContent=c.no;$('tname').textContent=c.name;$('tsub').textContent=c.sub+' · LINK ESTABLISHED';
+ const t=$('title');t.classList.remove('hide','show');void t.offsetWidth;t.classList.add('show');glitch();SFX.power();
+ setTimeout(()=>{buildScene(S.ch);$('place').textContent=c.sub.split(' · ')[0]+' · '+c.place},700);
+ setTimeout(()=>{t.classList.add('hide');run(c.intro,()=>{setGoal();if(S.ch===0)showHint()})},2750)}
+
+/* ---------- 최종 코드 입력 ---------- */
+function openCode(){const b=$('codeBox');$('glyphs').innerHTML=S.codes.map(c=>'<span>'+esc(c)+'</span>').join('');
+ $('codeIn').value='';$('cmsg').textContent='';b.classList.remove('hide');arm(b,450);setTimeout(()=>$('codeIn').focus(),90)}
+$('codeForm').addEventListener('submit',e=>{e.preventDefault();const b=$('codeBox');if(!armed(b))return;
+ const v=$('codeIn').value.replace(/[\s\/·.,\-]/g,'');
+ if(v==='자원봉사'){b.classList.add('hide');S.running=false;$('timer').classList.remove('low');$('timer').classList.add('stop');SFX.code();run(ENDING)}
+ else{$('cmsg').textContent='일치하지 않는 기록입니다. 복구한 네 글자를 순서대로 입력하세요.';SFX.bad();
+  const c=$('ccard');c.classList.remove('shake');void c.offsetWidth;c.classList.add('shake')}});
+
+/* ---------- 타이머 (실제 경과 시간 기준) ---------- */
+let lastTick=performance.now();
+function updTimer(){const el=$('timer');el.textContent=fmtT(S.time);el.classList.toggle('low',S.running&&S.time<=300)}
+setInterval(()=>{const n=performance.now(),dt=(n-lastTick)/1000;lastTick=n;if(!S.running||S.over)return;
+ S.time-=dt;if(S.time<=0){S.time=0;updTimer();fail();return}updTimer()},250);
+
+/* ---------- 실패 · 종료 · 재시작 ---------- */
+function fail(){if(S.over)return;S.over=true;S.running=false;setBusy(true);closeDlg();dQ=[];dDone=null;quizObj=null;
+ ['quiz','codeBox','alarm'].forEach(id=>$(id).classList.add('hide'));$('fail').classList.remove('hide');arm($('fail'),700);SFX.bad()}
+function finish(){S.over=true;S.running=false;const used=START_TIME-S.time;
+ $('endStat').textContent='남은 시간 '+fmtT(S.time)+' · 복구 소요 '+fmtT(used)+' · 해독 실패 '+S.wrong+'회';
+ $('hud').classList.add('hide');$('end').classList.remove('hide');arm($('end'),700);autoSpin=true}
+function restart(e){const ov=e.currentTarget.closest('.ov');if(ov&&!armed(ov))return;location.reload()}
+$('retry1').addEventListener('click',restart);$('retry2').addEventListener('click',restart);
+
+/* ---------- 음소거 · 키보드 · 시작 ---------- */
+$('mute').addEventListener('click',e=>{e.stopPropagation();AU.on=!AU.on;const b=$('mute');b.textContent=AU.on?'🔊':'🔇';b.setAttribute('aria-label',AU.on?'소리 끄기':'소리 켜기')});
+document.addEventListener('keydown',e=>{
+ if(!$('quiz').classList.contains('hide')){const k=parseInt(e.key,10);if(k>=1&&k<=4){e.preventDefault();answer(k-1)}return}
+ if(!$('codeBox').classList.contains('hide'))return;
+ if(S.dlg&&(e.key===' '||e.key==='Enter')){e.preventDefault();advance();return}
+ if(typeof keyLook==='function')keyLook(e)});
+$('go').addEventListener('click',()=>{const g=$('go');if(g.disabled)return;g.disabled=true;auInit();
+ $('start').classList.add('hide');$('hud').classList.remove('hide');autoSpin=false;S.ch=-1;
+ $('place').textContent='DONGNAE CITY · 중앙 광장';run(PROLOGUE,()=>{S.ch=0;enterChapter()})});
+</script>
+
+<script>
+'use strict';
+/* ===== PART 3-A : 3D 엔진 코어 · 전력(복구) 시스템 · 공용 소품 · 이름표 · 입력 · 렌더 루프 ===== */
+var FX={},SCN={},R={},autoSpin=true;
+let renderer=null,scene=null,camera=null,hemi=null,sun=null,skyMat=null,world=null,haloTex=null,HITM=null,TMP=null,V=null,ray=null,mv=null;
+let yaw=.5,pitch=-.03,tyaw=null,tpitch=null,vyaw=0,pd=null,sceneN=-1,looping=false,booted=false,lastT=0,fAcc=0,fN=0,lowQ=false,arL=null,arR=null;
+let anims=[],lamps=[],walkers=[],tags=[],lblEls=[],sceneTex=[];
+const PW={lv:0,tg:0,rate:.7,pal:null},MC={},WM=[];
+const clamp=(v,a,b)=>v<a?a:v>b?b:v,lerp=(p,e)=>p[0]+(p[1]-p[0])*e,DEG=Math.PI/180;
+const WCOL=[0x3df5c4,0xff8a5c,0x66ccff,0xffd166,0xc39bff,0xef6f8a],SKIN=0xd9a37e,GRAY=0x2e333e;
+
+/* 장면별 팔레트 [붕괴, 복구] — 복구율(0→1)에 따라 하늘·안개·조명이 보간된다 */
+const PAL={
+ plaza: {top:[0x06050b,0x24508a],bot:[0x3b2721,0xffbe92],hs:[0x9a8fb0,0xfff1e2],hg:[0x3a2a22,0x56606a],hi:[1.2,1.5],sc:[0xff9a66,0xffe2c0],si:[.5,1],fog:[[9,26],[46,105]]},
+ fort:  {top:[0x0a0608,0x1f3f6b],bot:[0x4a2517,0xf6a46c],hs:[0xb09590,0xffe8d4],hg:[0x3a2418,0x5a5648],hi:[1.25,1.5],sc:[0xff8a4a,0xffd6a0],si:[.55,1],fog:[[10,26],[46,105]]},
+ market:{top:[0x07060e,0x120d30],bot:[0x2b1f3d,0x5c3478],hs:[0x8f88c0,0xe2d6ff],hg:[0x2a1e36,0x4a3a5c],hi:[1.2,1.4],sc:[0xa080ff,0xffc8ea],si:[.45,.75],fog:[[9,24],[42,85]]},
+ stream:{top:[0x090e0b,0x3c7cc6],bot:[0x33402a,0xcbe7fb],hs:[0x9aa684,0xf0f8ff],hg:[0x2a321e,0x66805a],hi:[1.2,1.55],sc:[0xd8dc8a,0xfff6e0],si:[.5,1.15],fog:[[10,28],[46,115]]},
+ center:{top:[0x120507,0x7a8798],bot:[0x2a0b0f,0xc9d4df],hs:[0xc07080,0xffffff],hg:[0x3a1416,0x9aa6b6],hi:[1,1.5],sc:[0xff5060,0xfff8f0],si:[.4,.8],fog:[[14,30],[44,80]]}
+};
+
+/* ---------- 초기화 (WebGL이 안 되면 목록형 화면으로 전환) ---------- */
+function initGL(){if(typeof THREE==='undefined')throw new Error('three.js 로드 실패');
+ const cv=$('c');renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true,powerPreference:'high-performance'});
+ renderer.setPixelRatio(Math.min(1.75,window.devicePixelRatio||1));
+ scene=new THREE.Scene();scene.fog=new THREE.Fog(0,10,50);
+ camera=new THREE.PerspectiveCamera(66,1,.1,240);camera.position.set(0,1.7,0);camera.rotation.order='YXZ';
+ hemi=new THREE.HemisphereLight(0xffffff,0x333333,1);scene.add(hemi);
+ sun=new THREE.DirectionalLight(0xffffff,.6);sun.position.set(-10,16,8);scene.add(sun);
+ skyMat=new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,uniforms:{top:{value:new THREE.Color()},bot:{value:new THREE.Color()}},
+  vertexShader:'varying float vh;void main(){vh=normalize(position).y;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+  fragmentShader:'uniform vec3 top;uniform vec3 bot;varying float vh;void main(){gl_FragColor=vec4(mix(bot,top,smoothstep(-0.02,0.6,vh)),1.0);}'});
+ const sky=new THREE.Mesh(new THREE.SphereGeometry(170,24,12),skyMat);sky.renderOrder=-1;sky.frustumCulled=false;scene.add(sky);
+ TMP=new THREE.Color();V=new THREE.Vector3();ray=new THREE.Raycaster();mv=new THREE.Vector2();
+ HITM=new THREE.MeshBasicMaterial({visible:false});HITM.userData.keep=true;
+ haloTex=canvasTex(64,64,x=>{const g=x.createRadialGradient(32,32,0,32,32,32);[[0,1],[.22,.55],[.55,.12],[1,0]].forEach(s=>g.addColorStop(s[0],'rgba(255,255,255,'+s[1]+')'));x.fillStyle=g;x.fillRect(0,0,64,64)},true);
+ const facade=canvasTex(64,128,x=>{x.fillStyle='#272c37';x.fillRect(0,0,64,128);for(let j=0;j<8;j++)for(let i=0;i<4;i++){x.fillStyle='#141821';x.fillRect(4+i*15,5+j*15.5,10,9);x.fillStyle='#34405a';x.fillRect(4+i*15,5+j*15.5,10,2)}},true);
+ for(let k=0;k<5;k++){let s=(k+3)*7919;const rn=()=>(s=s*16807%2147483647)/2147483647;   // 창문 5개 그룹 = 복구 5단계
+  const lit=canvasTex(64,128,x=>{x.fillStyle='#000';x.fillRect(0,0,64,128);for(let j=0;j<8;j++)for(let i=0;i<4;i++)if(rn()<.62){x.fillStyle=rn()<.3?'#9fdcff':'#ffcf7a';x.fillRect(4+i*15,5+j*15.5,10,9)}},true);
+  const m=new THREE.MeshStandardMaterial({color:0xffffff,map:facade,emissive:0xffffff,emissiveMap:lit,emissiveIntensity:0,roughness:.7,metalness:.2,flatShading:true});m.userData.keep=true;WM.push(m)}
+ bindInput(cv);GL=true;document.body.classList.remove('nogl');resize();return true}
+function toNoGL(){const was=GL;GL=false;document.body.classList.add('nogl');$('loadErr').classList.remove('hide');$('arrowL').classList.add('hide');$('arrowR').classList.add('hide');
+ if(sceneN>=0&&sceneN<CH.length){objs=CH[sceneN].objs.map(def=>({def,g:null}));makeLabels()}
+ if(was&&$('start').classList.contains('hide'))toast('3D 화면 오류 · 목록형 화면으로 전환')}
+
+/* ---------- 재질 · 도형 · 텍스처 도우미 ---------- */
+function mat(c,o){if(!o&&MC[c])return MC[c];const m=new THREE.MeshStandardMaterial(Object.assign({color:c,flatShading:true,roughness:.82,metalness:.08},o||{}));if(!o){m.userData.keep=true;MC[c]=m}return m}
+function kmat(k,o){if(!MC[k]){MC[k]=new THREE.MeshStandardMaterial(Object.assign({flatShading:true,roughness:.8,metalness:.05},o));MC[k].userData.keep=true}return MC[k]}
+function glow(c,i){return mat(c,{emissive:c,emissiveIntensity:i==null?1:i})}
+function holo(c,op,wire){return new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:op==null?.5:op,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,wireframe:!!wire})}
+const B=(w,h,d)=>new THREE.BoxGeometry(w,h,d),CY=(a,b,h,s)=>new THREE.CylinderGeometry(a,b,h,s||8),CO=(r,h,s)=>new THREE.ConeGeometry(r,h,s||6),IC=(r,d)=>new THREE.IcosahedronGeometry(r,d||0),SP=(r,s)=>new THREE.SphereGeometry(r,s||8,Math.max(4,(s||8)-2));
+function add(p,geo,m,x,y,z){const o=new THREE.Mesh(geo,typeof m==='number'?mat(m):m);o.position.set(x||0,y||0,z||0);p.add(o);return o}
+function at(g,deg,r,y){const a=deg*DEG;g.position.set(Math.sin(a)*r,y||0,-Math.cos(a)*r);g.rotation.y=-a;return g}   // +Z 면이 카메라(중심)를 향함
+function ring(n,fn){for(let i=0;i<n;i++)fn(i,i/n*360)}
+function canvasTex(w,h,draw,keep){const c=document.createElement('canvas');c.width=w;c.height=h;draw(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);if(keep)t.wrapS=t.wrapT=THREE.RepeatWrapping;else sceneTex.push(t);return t}
+function halo(p,c,s,x,y,z,op){const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:haloTex,color:c,transparent:true,opacity:op==null?.85:op,blending:THREE.AdditiveBlending,depthWrite:false}));sp.scale.set(s,s,1);sp.position.set(x||0,y||0,z||0);p.add(sp);return sp}
+function pool(p,c,r,x,z){const m=new THREE.MeshBasicMaterial({map:haloTex,color:c,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});const o=new THREE.Mesh(new THREE.CircleGeometry(r,20),m);o.rotation.x=-Math.PI/2;o.position.set(x||0,.05,z||0);p.add(o);return m}
+function bbTex(a,b,col){return canvasTex(256,128,x=>{x.strokeStyle=col;x.lineWidth=3;x.strokeRect(5,5,246,118);x.fillStyle=col;x.textAlign='center';x.textBaseline='middle';
+ x.font='700 38px "Chakra Petch","Arial Narrow",sans-serif';x.fillText(a,128,52,228);x.font='600 17px "Chakra Petch",sans-serif';x.fillText(b,128,94,228);
+ x.globalAlpha=.16;for(let y=0;y<128;y+=4)x.fillRect(0,y,256,1)})}
+function wordTex(){return canvasTex(512,256,x=>{x.textAlign='center';x.textBaseline='middle';x.shadowColor='#3df5c4';x.shadowBlur=30;x.fillStyle='#c6fff2';
+ x.font='900 128px "Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';x.fillText('자원봉사',256,110,492);
+ x.shadowBlur=12;x.fillStyle='#3df5c4';x.font='700 24px "Chakra Petch",sans-serif';x.fillText('VOLUNTEER · RECORDS RESTORED',256,214,480)})}
+
+/* ---------- 전력(복구) 시스템 : 문제를 풀 때마다 조명·창문·네온이 차례로 켜진다 ---------- */
+// lamp({t:임계값, em:[[재질,켜짐,꺼짐]], op:[[재질,불투명도]], vis:[켜지면 보임], hide:[켜지면 숨김], li:[조명,세기], fn, inv})
+function lamp(o){o.k=0;o.a=-1;lamps.push(o);return o}
+function lampApply(L,k){if(L.inv)k=1-k;
+ if(L.em)L.em.forEach(e=>{e[0].emissiveIntensity=(e[2]||0)+(e[1]-(e[2]||0))*k});
+ if(L.op)L.op.forEach(e=>{e[0].opacity=e[1]*k});
+ if(L.vis)L.vis.forEach(o=>{o.visible=k>.5});
+ if(L.hide)L.hide.forEach(o=>{o.visible=k<=.5});
+ if(L.li)L.li[0].intensity=L.li[1]*k;
+ if(L.fn)L.fn(k)}
+function setPower(v,snap){PW.tg=clamp(v,0,1);if(snap){PW.lv=PW.tg;lamps.forEach(L=>{L.k=PW.lv>=L.t-1e-4?1:0});applyPal()}}
+function updPower(dt){const d=PW.tg-PW.lv;if(Math.abs(d)>1e-4){PW.lv+=Math.sign(d)*Math.min(Math.abs(d),dt*PW.rate);applyPal()}
+ for(const L of lamps){const want=PW.lv>=L.t-1e-4?1:0;
+  if(L.k!==want){L.k+=(want-L.k)*Math.min(1,dt*(want?2.8:6));if(Math.abs(want-L.k)<.02)L.k=want}
+  let kk=L.k;if(want&&kk<1&&!RM&&Math.random()<.3)kk*=.12;            // 켜질 때 깜빡임
+  if(Math.abs(kk-L.a)>.002){L.a=kk;lampApply(L,kk)}}}
+function lc(c,a,e){c.setHex(a[0]).lerp(TMP.setHex(a[1]),e)}
+function applyPal(){const p=PW.pal;if(!p||!skyMat)return;const e=PW.lv;
+ lc(skyMat.uniforms.top.value,p.top,e);lc(skyMat.uniforms.bot.value,p.bot,e);scene.fog.color.copy(skyMat.uniforms.bot.value);
+ lc(hemi.color,p.hs,e);lc(hemi.groundColor,p.hg,e);hemi.intensity=lerp(p.hi,e);lc(sun.color,p.sc,e);sun.intensity=lerp(p.si,e);
+ scene.fog.near=lerp(p.fog[0],e);scene.fog.far=lerp(p.fog[1],e)}
+function fadeTo(o,k,v,d){const s=o[k],t0=performance.now(),dur=(RM?.05:d)*1000;anims.push(()=>{const e=Math.min(1,(performance.now()-t0)/dur);o[k]=s+(v-s)*(1-Math.pow(1-e,3));return e>=1?1:0})}
+
+/* ---------- 공용 소품 ---------- */
+function beacon(p,x,y,z,t,okCol){const h=halo(p,0xff2a40,1.5,x,y,z),ph=Math.random()*6;   // 경보등 → 복구되면 차분한 불빛
+ anims.push(tm=>{const on=PW.lv>=t;h.material.color.setHex(on?(okCol||0xbfefff):0xff2a40);h.material.opacity=on?.3+.18*Math.sin(tm*1.4+ph):(Math.sin(tm*4.2+ph)>0?.95:.06)});return h}
+function streetLamp(p,deg,r,t){const g=new THREE.Group();add(g,CY(.07,.1,4.2,6),0x3a3f4a,0,2.1,0);add(g,B(1.1,.1,.16),0x3a3f4a,.5,4.15,0);
+ const hm=glow(0xfff1d6,0);add(g,B(.5,.08,.22),hm,.95,4.06,0);const hl=halo(g,0xffe2aa,2.4,.95,3.95,0,0),pm=pool(g,0xffd08a,2.4,.95,0);
+ lamp({t,em:[[hm,2.2,.02]],op:[[hl.material,.7],[pm,.55]]});p.add(at(g,deg,r));return g}
+function uvBox(geo,w,h,d){const uv=geo.attributes.uv,dm=[[d,h],[d,h],[w,d],[w,d],[w,h],[w,h]];for(let f=0;f<6;f++)for(let k=0;k<4;k++){const i=f*4+k;uv.setXY(i,uv.getX(i)*dm[f][0]/6,uv.getY(i)*dm[f][1]/12)}uv.needsUpdate=true}
+function skyline(p,n,r0,r1,h0,h1,seed){let s=seed*9301+49297;const rn=()=>(s=s*16807%2147483647)/2147483647,roof=mat(0x181b22);
+ for(let i=0;i<n;i++){const a=(i+rn()*.6)/n*360,r=r0+rn()*(r1-r0),h=h0+rn()*(h1-h0),w=4+rn()*5,d=4+rn()*5,gi=i%5,g=new THREE.Group(),geo=B(w,h,d);uvBox(geo,w,h,d);
+  const m=new THREE.Mesh(geo,[WM[gi],WM[gi],roof,roof,WM[gi],WM[gi]]);m.position.y=h/2;g.add(m);
+  if(rn()<.4){add(g,CY(.07,.07,4,4),0x3c424e,0,h+2,0);beacon(g,0,h+4.1,0,(gi+1)*.2)}p.add(at(g,a,r))}
+ WM.forEach((m,i)=>lamp({t:(i+1)*.2-.001,em:[[m,1.15,.03]]}))}
+function billboard(p,deg,r,y,w,h,tb,tr,t){const g=new THREE.Group();add(g,B(w+.4,h+.4,.3),0x1a1e26,0,y,-.22);add(g,B(.35,y-h/2,.35),0x2a2f3a,0,(y-h/2)/2,-.3);
+ const ta=bbTex(tb[0],tb[1],'#ff3d5a'),tb2=bbTex(tr[0],tr[1],'#3df5c4'),m=new THREE.MeshBasicMaterial({map:ta,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false});
+ add(g,new THREE.PlaneGeometry(w,h),m,0,y,0);let st=-1;
+ anims.push(tm=>{const on=PW.lv>=t?1:0;if(on!==st){st=on;m.map=on?tb2:ta}m.opacity=on?.95:(Math.random()<.1?.08:.8-.12*Math.sin(tm*23))});p.add(at(g,deg,r));return g}
+function dust(n,col,area,hgt,up){const pos=new Float32Array(n*3);for(let i=0;i<n;i++){pos[i*3]=(Math.random()-.5)*area;pos[i*3+1]=Math.random()*hgt;pos[i*3+2]=(Math.random()-.5)*area}
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+ const m=new THREE.PointsMaterial({color:col,size:up?.12:.08,transparent:true,opacity:0,depthWrite:false,blending:up?THREE.AdditiveBlending:THREE.NormalBlending});world.add(new THREE.Points(geo,m));
+ anims.push((tm,dt)=>{for(let i=0;i<n;i++){const j=i*3+1;let y=pos[j]+(up?1:-1)*dt*(.3+(i%7)*.06);if(y<0)y+=hgt;else if(y>hgt)y-=hgt;pos[j]=y;pos[i*3]+=Math.sin(tm*.6+i)*dt*.15}
+  geo.attributes.position.needsUpdate=true;m.opacity=up?.85*PW.lv:.75*(1-PW.lv*.9)})}
+
+/* ---------- 사람 실루엣 : 붕괴 땐 회색·스마트폰만 봄 → 복구되면 색을 되찾고 고개를 든다 ---------- */
+function person(p,o){const g=new THREE.Group(),gm=mat(GRAY),legs=[];
+ [-.09,.09].forEach(lx=>{const h=new THREE.Group();h.position.set(lx,.66,0);g.add(h);add(h,B(.13,.64,.15),gm,0,-.32,0);legs.push(h)});
+ const body=add(g,CY(.17,.21,.74,6),gm,0,1.03,0),neck=new THREE.Group();neck.position.y=1.4;g.add(neck);
+ const head=add(neck,IC(.16),gm,0,.17,0),phone=add(neck,B(.09,.15,.02),kmat('phone',{color:0x9fe8ff,emissive:0x9fe8ff,emissiveIntensity:1.8}),0,-.05,.27);phone.rotation.x=-.6;p.add(g);
+ const w={g,legs,body,head,neck,phone,gm,on:null,t:o.t==null?.6:o.t,col:o.col||WCOL[walkers.length%6],still:!!o.still,path:o.path,r:o.r,ph:0,sp:0};
+ if(o.path){const q=o.path;w.sp=(o.v||1)/Math.hypot(q[2]-q[0],q[3]-q[1]);w.ph=Math.random()*2}
+ else if(o.r){w.sp=(o.v||1)/o.r*(o.dir||1);w.ph=Math.random()*6.283}
+ if(o.pos){g.position.set(o.pos[0],0,o.pos[1]);g.rotation.y=o.pos[2]||0}
+ walkers.push(w);return w}
+function updWalkers(dt,tm){for(const w of walkers){const on=PW.lv>=w.t-1e-4;
+ if(on!==w.on){w.on=on;w.body.material=on?mat(w.col):w.gm;w.head.material=on?mat(SKIN):w.gm;w.legs.forEach(h=>{h.children[0].material=on?mat(0x2b3550):w.gm});w.phone.visible=!on}
+ w.neck.rotation.x+=((on?0:.6)-w.neck.rotation.x)*Math.min(1,dt*3);
+ if(w.still||!w.sp){w.g.position.y=Math.abs(Math.sin(tm*1.6+w.ph))*.02;continue}
+ w.ph+=dt*w.sp;let x,z,dx,dz;
+ if(w.path){const q=w.path,u=((w.ph%2)+2)%2,fw=u<1,f=fw?u:2-u;x=q[0]+(q[2]-q[0])*f;z=q[1]+(q[3]-q[1])*f;dx=(q[2]-q[0])*(fw?1:-1);dz=(q[3]-q[1])*(fw?1:-1)}
+ else{const a=w.ph,sg=w.sp<0?-1:1;x=Math.sin(a)*w.r;z=-Math.cos(a)*w.r;dx=Math.cos(a)*sg;dz=Math.sin(a)*sg}
+ const s=Math.sin(tm*7+w.ph*5);w.g.position.set(x,Math.abs(s)*.035,z);w.g.rotation.y=Math.atan2(dx,dz);w.legs[0].rotation.x=s*.55;w.legs[1].rotation.x=-s*.55}}
+
+/* ---------- 장면 관리 ---------- */
+function addObj(def,g,deg,r,y,ly){at(g,deg,r,y);g.userData={oid:def.id,ly};world.add(g);
+ const hit=new THREE.Mesh(SP(Math.max(1.1,ly*.36),6),HITM);hit.position.y=ly*.5;g.add(hit);objs.push({def,g,deg,r});return g}
+function resetWorld(pal){
+ if(world){scene.remove(world);world.traverse(o=>{if(o.geometry&&!o.isSprite)o.geometry.dispose();if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{if(!m.userData.keep)m.dispose()})})}
+ sceneTex.forEach(t=>t.dispose());sceneTex=[];
+ world=new THREE.Group();scene.add(world);anims=[];lamps=[];walkers=[];tags=[];R={};objs=[];
+ PW.pal=pal;PW.lv=PW.tg=0;PW.rate=.7;WM.forEach(m=>{m.emissiveIntensity=0});applyPal()}
+function buildScene(n){sceneN=n;tyaw=tpitch=null;vyaw=0;
+ if(GL){try{SCN[n]()}catch(err){console.error(err);toNoGL()}}
+ if(GL&&n>=0&&n<CH.length&&objs.length!==CH[n].objs.length)toNoGL();      // 장면 생성 실패 시에도 진행 가능
+ if(!GL)objs=(n>=0&&n<CH.length)?CH[n].objs.map(def=>({def,g:null})):[];
+ makeLabels()}
+function sceneSolved(n){const o=objs[n-1];if(GL&&o&&o.g)solvedFX(o.g);setPower(n/5)}
+function solvedFX(g){const mk=op=>new THREE.MeshBasicMaterial({color:0x3df5c4,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide});
+ const base=new THREE.Mesh(new THREE.RingGeometry(.9,1.02,40),mk(.6));base.rotation.x=-Math.PI/2;base.position.y=.07;g.add(base);if(RM)return;
+ const wv=new THREE.Mesh(new THREE.RingGeometry(.9,1.06,40),mk(.9));wv.rotation.x=-Math.PI/2;wv.position.y=.08;g.add(wv);
+ const bm=new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,8,18,1,true),mk(.35));bm.position.y=4;g.add(bm);const t0=performance.now();
+ anims.push(()=>{const e=(performance.now()-t0)/1300;if(e>=1){[wv,bm].forEach(o=>{g.remove(o);o.geometry.dispose();o.material.dispose()});return 1}
+  wv.scale.setScalar(1+e*2.6);wv.material.opacity=.9*(1-e);bm.material.opacity=.35*(1-e);bm.scale.set(1-e*.7,1+e*.3,1-e*.7);return 0})}
+function lookAtObj(i){tags.forEach(t=>{if(t.tmp)t.exp=0});const o=objs[i];if(!GL||!o||!o.g)return;
+ tyaw=-o.deg*DEG;tpitch=clamp(Math.atan2(o.g.position.y+o.g.userData.ly*.5-1.7,o.r)*.9,-.3,.55)}
+
+/* ---------- 이름표 · 위치 태그 · 방향 화살표 ---------- */
+function makeLabels(){const box=$('labels');box.innerHTML='';tags=[];
+ lblEls=objs.map((o,i)=>{const b=document.createElement('button');b.type='button';b.className='lbl lock';
+  b.innerHTML='<i aria-hidden="true"></i><span>'+esc(o.def.name)+'</span><b>NEXT</b>';if(GL){b.style.display='none';b._v=false}
+  b.addEventListener('click',e=>{e.stopPropagation();tryObj(i)});box.appendChild(b);return b});
+ refreshLabels()}
+function refreshLabels(){lblEls.forEach((b,i)=>{const st=i<S.next?'done':i===S.next?'next':'lock';b.className='lbl '+st;
+ b.setAttribute('aria-label',(objs[i]?objs[i].def.name:'')+' — '+(st==='done'?'복구 완료':st==='next'?'다음 조사 대상':'잠김'))})}
+function addTag(em,txt,v,cls,ttl){if(!GL)return null;const el=document.createElement('div');el.className='tag'+(cls?' '+cls:'');
+ el.innerHTML=(em?'<em>'+esc(em)+'</em>':'')+esc(txt);el.style.display='none';$('labels').appendChild(el);
+ const t={el,v,exp:ttl?performance.now()+ttl:Infinity,tmp:!!ttl,_v:false};tags.push(t);return t}
+function placeUI(){const w=innerWidth,h=innerHeight;let L=false,Rt=false;
+ for(let i=0;i<objs.length;i++){const o=objs[i],el=lblEls[i];if(!o.g||!el)continue;
+  V.set(0,o.g.userData.ly,0);o.g.localToWorld(V);V.project(camera);const vis=V.z<1&&V.x>-1.05&&V.x<1.05&&V.y>-1.1&&V.y<1.1;
+  if(vis!==el._v){el._v=vis;el.style.display=vis?'':'none'}
+  if(vis)el.style.transform='translate3d('+((V.x+1)*w/2).toFixed(1)+'px,'+((1-V.y)*h/2-10).toFixed(1)+'px,0) translate(-50%,-100%)';
+  if(i===S.next&&!S.busy&&!S.over&&(!vis||Math.abs(V.x)>.9)){V.set(0,1,0);o.g.localToWorld(V);V.applyMatrix4(camera.matrixWorldInverse);if(V.x<0)L=true;else Rt=true}}
+ const now=performance.now();
+ for(let i=tags.length-1;i>=0;i--){const t=tags[i];if(now>t.exp){t.el.remove();tags.splice(i,1);continue}
+  V.copy(t.v).project(camera);const vis=V.z<1&&Math.abs(V.x)<1.1&&Math.abs(V.y)<1.1;
+  if(vis!==t._v){t._v=vis;t.el.style.display=vis?'':'none'}
+  if(vis)t.el.style.transform='translate3d('+((V.x+1)*w/2).toFixed(1)+'px,'+((1-V.y)*h/2).toFixed(1)+'px,0) translate(-50%,-50%)'}
+ if(L!==arL){arL=L;$('arrowL').classList.toggle('hide',!L)}if(Rt!==arR){arR=Rt;$('arrowR').classList.toggle('hide',!Rt)}}
+function pick(x,y){if(S.busy||S.over||!objs.length)return;const rc=renderer.domElement.getBoundingClientRect();
+ mv.set((x-rc.left)/rc.width*2-1,-((y-rc.top)/rc.height)*2+1);ray.setFromCamera(mv,camera);
+ for(const h of ray.intersectObjects(objs.map(o=>o.g),true)){let o=h.object,ok=true;while(o&&!(o.userData&&o.userData.oid)){if(!o.visible)ok=false;o=o.parent}
+  if(o&&ok){const i=objs.findIndex(k=>k.g===o);if(i>=0){tryObj(i);return}}}}
+
+/* ---------- 입력 : 드래그로 둘러보기 · 탭으로 조사/대화 진행 · 방향키 ---------- */
+function bindInput(cv){
+ cv.addEventListener('pointerdown',e=>{if(!GL||e.button>0)return;pd={x:e.clientX,y:e.clientY,m:0,id:e.pointerId,t:performance.now()};vyaw=0;try{cv.setPointerCapture(e.pointerId)}catch(_){}});
+ cv.addEventListener('pointermove',e=>{if(!pd||e.pointerId!==pd.id)return;const dx=e.clientX-pd.x,dy=e.clientY-pd.y,now=performance.now();pd.m+=Math.abs(dx)+Math.abs(dy);pd.x=e.clientX;pd.y=e.clientY;
+  if(pd.m>8){cv.classList.add('drag');tyaw=tpitch=null;const k=innerWidth<720?.0062:.0042;yaw+=dx*k;pitch=clamp(pitch+dy*k*.85,-.5,.7);vyaw=clamp(vyaw*.5+dx*k/Math.max(.008,(now-pd.t)/1000)*.5,-5,5);hideHint()}pd.t=now});
+ const up=e=>{if(!pd||e.pointerId!==pd.id)return;cv.classList.remove('drag');const tap=pd.m<=8,stale=performance.now()-pd.t>90;pd=null;if(tap||stale||RM)vyaw=0;
+  if(tap&&e.type==='pointerup'){if(S.dlg)advance();else pick(e.clientX,e.clientY)}};
+ cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
+ cv.addEventListener('touchend',e=>{if(e.cancelable)e.preventDefault()},{passive:false});   // 모바일 유령 클릭 방지
+ cv.addEventListener('webglcontextlost',e=>{e.preventDefault();toNoGL()});
+ cv.addEventListener('contextmenu',e=>e.preventDefault());
+ addEventListener('resize',resize)}
+function keyLook(e){if(!GL||S.over)return;const k=e.key,y0=tyaw==null?yaw:tyaw,p0=tpitch==null?pitch:tpitch;
+ if(k==='ArrowLeft')tyaw=y0+.4;else if(k==='ArrowRight')tyaw=y0-.4;else if(k==='ArrowUp')tpitch=clamp(p0+.15,-.5,.7);else if(k==='ArrowDown')tpitch=clamp(p0-.15,-.5,.7);else return;e.preventDefault()}
+function resize(){if(!renderer)return;const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?78:66;camera.updateProjectionMatrix()}
+
+/* ---------- 렌더 루프 · 부팅 ---------- */
+function loop(now){if(!GL){looping=false;return}requestAnimationFrame(loop);
+ const dt=Math.min(.05,lastT?(now-lastT)/1000:.016),tm=now/1000;lastT=now;
+ if(autoSpin&&!pd&&!RM)yaw+=dt*.05;
+ if(tyaw!==null){const d=Math.atan2(Math.sin(tyaw-yaw),Math.cos(tyaw-yaw));yaw+=d*Math.min(1,dt*4.5);if(Math.abs(d)<.002)tyaw=null}
+ if(tpitch!==null){const d=tpitch-pitch;pitch+=d*Math.min(1,dt*4.5);if(Math.abs(d)<.002)tpitch=null}
+ if(!pd&&vyaw){yaw+=vyaw*dt;vyaw*=Math.exp(-dt*5);if(Math.abs(vyaw)<.01)vyaw=0}
+ camera.rotation.set(pitch,yaw,0);updPower(dt);updWalkers(dt,tm);
+ for(let i=anims.length-1;i>=0;i--){try{if(anims[i](tm,dt)===1)anims.splice(i,1)}catch(e){console.error(e);anims.splice(i,1)}}
+ renderer.render(scene,camera);placeUI();
+ fAcc+=dt;fN++;if(fAcc>=3){if(!lowQ&&fAcc/fN>.036&&renderer.getPixelRatio()>1){lowQ=true;renderer.setPixelRatio(1);resize()}fAcc=0;fN=0}}   // 느린 기기 자동 화질 조정
+function startLoop(){if(looping||!GL)return;looping=true;requestAnimationFrame(loop)}
+function fontsReady(){if(!document.fonts||!document.fonts.load)return Promise.resolve();
+ return Promise.race([Promise.all([document.fonts.load('700 40px "Chakra Petch"'),document.fonts.load('900 100px "Noto Sans KR"','자원봉사')]).catch(()=>0),new Promise(r=>setTimeout(r,1500))])}
+function boot(){const go=$('go');let ok=false;try{ok=initGL()}catch(e){console.warn(e)}if(!ok)toNoGL();
+ const fin=()=>{if(booted)return;booted=true;try{if(GL){buildScene(-1);startLoop()}}catch(e){console.error(e);toNoGL()}go.disabled=false;go.textContent='조사 시작'};
+ (GL?fontsReady():Promise.resolve()).then(fin,fin);setTimeout(fin,4000)}
+$('go').addEventListener('click',()=>{if(GL){tyaw=0;tpitch=.03}});   // 시작하면 도시 코어 쪽으로 시선 이동
+</script>
+
+ <script>
+'use strict';
+/* ===== PART 3-B-1 : 장면 공용 소품 · 중앙 광장(프롤로그·엔딩) 장면 · 프롤로그/엔딩 연출 ===== */
+
+/* ---------- 공용 도우미 ---------- */
+function neon(c,base){return mat(base||0x1b1f27,{emissive:c,emissiveIntensity:0,roughness:.45})}   // 꺼져 있다가 복구되면 빛나는 재질
+function hf(c,op,wire){const m=holo(c,op,wire);m.fog=false;return m}                             // 스모그를 뚫고 보이는 홀로그램
+function unfog(){world.traverse(o=>{const m=o.material;if(m)(Array.isArray(m)?m:[m]).forEach(x=>{if(x.blending===THREE.AdditiveBlending)x.fog=false})})}
+function tween(d,fn,delay){const t0=performance.now()+(delay||0)*1000,dur=RM?1:d*1000;
+ anims.push(()=>{const n=performance.now();if(n<t0)return 0;const e=Math.min(1,(n-t0)/dur);fn(1-Math.pow(1-e,3));return e>=1?1:0})}
+function wpos(o,x,y,z){o.updateWorldMatrix(true,false);return o.localToWorld(new THREE.Vector3(x||0,y||0,z||0))}
+function wxz(deg,r){return [Math.sin(deg*DEG)*r,-Math.cos(deg*DEG)*r]}
+function stripeTex(){return canvasTex(64,16,(x,w,h)=>{x.fillStyle='#ffc93c';x.fillRect(0,0,w,h);x.fillStyle='#16181c';
+ for(let i=-16;i<w;i+=16){x.beginPath();x.moveTo(i,h);x.lineTo(i+8,0);x.lineTo(i+16,0);x.lineTo(i+8,h);x.fill()}})}
+
+/* ---------- 과거 기록 홀로그램 인물 (pose: stand · bend · carry · pair) ---------- */
+function ghost(p,x,z,ry,pose,m){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;
+ add(g,B(.13,.66,.15),m,-.09,.33,0);add(g,B(.13,.66,.15),m,.09,.33,0);
+ const up=new THREE.Group();up.position.y=.66;up.rotation.x=pose==='bend'?.6:0;g.add(up);
+ add(up,CY(.17,.21,.74,6),m,0,.37,0);add(up,IC(.16),m,0,.92,0);
+ [-1,1].forEach(s=>{const a=new THREE.Group();a.position.set(s*.25,.68,0);up.add(a);add(a,B(.09,.58,.09),m,0,-.29,0);
+  a.rotation.x=(pose==='carry'||pose==='pair')?-1.25:pose==='bend'?(s>0?-.95:-.35):0});
+ if(pose==='carry')add(up,B(.5,.4,.5),m,0,.5,.62);
+ add(g,new THREE.RingGeometry(.42,.5,24),m,0,.02,0).rotation.x=-Math.PI/2;p.add(g);return g}
+
+/* ---------- 도시 소품 ---------- */
+function tower(p,deg,r,w,h,d,gi){const g=new THREE.Group(),geo=B(w,h,d),rf=mat(0x181b22);uvBox(geo,w,h,d);
+ const m=new THREE.Mesh(geo,[WM[gi],WM[gi],rf,rf,WM[gi],WM[gi]]);m.position.y=h/2;g.add(m);
+ add(g,B(w*.45,.9,d*.45),0x272b33,0,h+.45,0);add(g,CY(.05,.05,3.2,4),0x3c424e,w*.3,h+1.6,d*.2);beacon(g,w*.3,h+3.25,d*.2,1);
+ p.add(at(g,deg,r));return g}
+function pole(p,deg,r,h,t){const g=new THREE.Group();add(g,CY(.05,.07,h,6),0x3a3f4a,0,h/2,0);add(g,B(.22,.14,.22),0x2a2f38,0,h,0);beacon(g,0,h+.16,0,t);p.add(at(g,deg,r));return g}
+function barrier(p,deg,r,sm){const g=new THREE.Group();add(g,B(1.7,.3,.08),sm,0,.8,0);
+ [-.72,.72].forEach(x=>{add(g,B(.07,.82,.07),0x2b2f36,x,.41,0);add(g,B(.42,.05,.3),0x2b2f36,x,.03,0)});beacon(g,-.72,.98,0,1);p.add(at(g,deg,r));return g}
+function debris(n,r0,r1,t){const g=new THREE.Group(),G=[B(.34,.02,.44),CY(.06,.06,.2,6),IC(.13),B(.3,.16,.22)],Y=[.02,.06,.08,.08],C=[0xbdb6a6,0x7f9aaf,0x9c7a50,0x5d6670,0xc9c2b0];world.add(g);
+ for(let i=0;i<n;i++){const a=Math.random()*6.283,r=r0+Math.random()*(r1-r0),k=i%4,o=add(g,G[k],C[i%5],Math.sin(a)*r,Y[k],-Math.cos(a)*r);o.rotation.set(k===1?Math.PI/2:0,Math.random()*6.283,0)}
+ if(t)lamp({t,hide:[g]});return g}                                                               // 복구되면 쓰레기가 치워진다
+function drone(p,y,r,sp,ph){const g=new THREE.Group(),pm=hf(0xbfefff,.3);add(g,B(.55,.12,.55),0x2b303a);
+ [[-.36,-.36],[.36,-.36],[-.36,.36],[.36,.36]].forEach(q=>{add(g,new THREE.CircleGeometry(.17,12),pm,q[0],.08,q[1]).rotation.x=-Math.PI/2});
+ halo(g,0x3df5c4,.7,0,-.12,0,.9);p.add(g);
+ anims.push(tm=>{const a=tm*sp+ph;g.position.set(Math.sin(a)*r,y+Math.sin(tm*1.4+ph)*.35,-Math.cos(a)*r);g.rotation.y=-a});return g}
+
+/* 순환 고가 자기부상 철로 : 오른쪽(90°~) 구간이 끊어져 있고, 완전 복구되면 홀로그램 다리가 이어진다 */
+function railLoop(p,r,y,gapDeg){const gap=gapDeg*DEG,st=mat(0x3b414c,{metalness:.5,roughness:.5});
+ add(p,new THREE.TorusGeometry(r,.38,4,120,Math.PI*2-gap),st,0,y,0).rotation.x=-Math.PI/2;
+ const sm=neon(0x66ccff);add(p,new THREE.TorusGeometry(r,.06,3,120,Math.PI*2-gap),sm,0,y+.42,0).rotation.x=-Math.PI/2;
+ const bm=hf(0x3df5c4,0);add(p,new THREE.TorusGeometry(r,.38,4,16,gap),bm,0,y,0).rotation.set(-Math.PI/2,0,Math.PI*2-gap);
+ lamp({t:.8,em:[[sm,1.5,0]]});lamp({t:1,op:[[bm,.5]]});
+ const gp=B(1.3,.3,.9),gc=CY(.3,.4,y-.3,6),pm=mat(0x30353f);
+ for(let d=0;d<360;d+=15){if(d>86&&d<94+gapDeg)continue;const pl=new THREE.Group();add(pl,gc,pm,0,(y-.3)/2,0);add(pl,gp,pm,0,y-.3,0);p.add(at(pl,d,r))}
+ const dg=new THREE.Group();add(dg,B(4.4,.46,1),st,1.7,y-1.3,0).rotation.z=-.62;p.add(at(dg,90,r));lamp({t:1,hide:[dg]})}
+function train(p,r,y,start){const wh=mat(0xcfd6e0,{roughness:.4,metalness:.3}),win=neon(0x9fdcff,0x16202b),cars=[],dA=5.35/r/DEG;let hl=null;
+ for(let i=0;i<3;i++){const g=new THREE.Group();add(g,B(5,1.15,1.35),wh);add(g,B(4.6,.36,1.38),win,0,.16,0);
+  if(!i){add(g,new THREE.CylinderGeometry(.02,.68,1.5,4,1),wh,3.25,0,0).rotation.set(Math.PI/4,0,-Math.PI/2);hl=halo(g,0xffffff,1.8,4,0,0,0)}
+  p.add(g);cars.push(g)}
+ lamp({t:1,em:[[win,1.6,0]],op:[[hl.material,.9]]});let ph=start;
+ anims.push((tm,dt)=>{if(PW.lv>=.999)ph+=dt*11;for(let i=0;i<3;i++)at(cars[i],ph-i*dA,r,y)});return cars}
+
+/* 중앙 홀로그램 지도 : 프롤로그에서 기록이 남은 네 곳을 표시 */
+function cityMap(p,deg,r){const g=new THREE.Group();add(g,CY(.7,.95,1,8),0x2a2f3a,0,.5,0);add(g,CY(1.42,1.42,.1,32),0x161a22,0,1.05,0);
+ const rim=neon(0x3df5c4);add(g,CY(1.45,1.45,.04,32),rim,0,1.1,0);lamp({t:.2,em:[[rim,1.4,0]]});
+ const ns=hf(0xff3d5a,.6),nr=add(g,new THREE.RingGeometry(.45,.6,32),ns,0,1.14,0);nr.rotation.x=-Math.PI/2;   // NO SIGNAL
+ const m=new THREE.Group();m.position.y=1.16;m.visible=false;g.add(m);
+ const grid=new THREE.GridHelper(2.6,12,0x3df5c4,0x3df5c4);Object.assign(grid.material,{transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false});m.add(grid);
+ const bw=hf(0x3df5c4,.45,true),gb=B(1,1,1);
+ for(let i=0;i<16;i++){const h=.12+Math.random()*.42;add(m,gb,bw,(Math.random()-.5)*2.2,h/2,(Math.random()-.5)*2.2).scale.set(.16,h,.16)}
+ const rv=hf(0x66ccff,.8),pt=[[-1.25,.95],[-.6,.72],[0,.85],[.6,.5],[1.25,.62]];                     // 온천천
+ for(let i=0;i<4;i++){const a=pt[i],b=pt[i+1];add(m,B(Math.hypot(b[0]-a[0],b[1]-a[1]),.02,.08),rv,(a[0]+b[0])/2,.02,(a[1]+b[1])/2).rotation.y=-Math.atan2(b[1]-a[1],b[0]-a[0])}
+ const pins=[['01','동래읍성',-1.05,-.6,1.05,0x3df5c4],['02','동래시장',.95,-.4,.75,0x3df5c4],['03','온천천',-.45,.62,.42,0x66ccff],['??','UNKNOWN',.3,.05,1.4,0xff3d5a]].map(q=>{
+  const pm=hf(q[5],.9);add(m,CY(.014,.014,q[4],4),pm,q[2],q[4]/2,q[3]);const top=add(m,new THREE.OctahedronGeometry(.075),pm,q[2],q[4]+.08,q[3]);
+  add(m,new THREE.RingGeometry(.07,.11,16),pm,q[2],.03,q[3]).rotation.x=-Math.PI/2;return {em:q[0],name:q[1],top,pm,unk:q[0]==='??'}});
+ const M={g,map:m,nr,pins,on:false};
+ anims.push(tm=>{if(nr.visible)ns.opacity=Math.sin(tm*5)>0?.75:.12;if(!m.visible)return;
+  pins.forEach((q,i)=>{q.top.rotation.y=tm*2+i;q.top.scale.setScalar(q.unk&&!M.on?1+.4*Math.abs(Math.sin(tm*4)):1)})});
+ p.add(at(g,deg,r));return M}
+
+/* ================= 장면 -1 : DONGNAE CITY 중앙 광장 (시작 화면 · 프롤로그 · 엔딩) ================= */
+SCN[-1]=function(){resetWorld(PAL.plaza);const W=world;
+ /* 바닥 : 갈라진 광장 + 꺼진 LED 링 */
+ add(W,CY(80,80,.2,40),0x1a1d23,0,-.1,0);
+ add(W,new THREE.RingGeometry(2.6,9.3,56),0x242830,0,.012,0).rotation.x=-Math.PI/2;
+ const led=neon(0x3df5c4);add(W,new THREE.RingGeometry(9.3,9.5,72),led,0,.02,0).rotation.x=-Math.PI/2;lamp({t:.4,em:[[led,1.5,0]]});
+ const ck=mat(0x0b0d11);for(let i=0;i<10;i++){const a=Math.random()*6.283,r=3+Math.random()*5.8;add(W,B(.05,.02,1+Math.random()*1.8),ck,Math.sin(a)*r,.03,-Math.cos(a)*r).rotation.y=Math.random()*3.14}
+ const [hx,hz]=wxz(153,7.6);add(W,new THREE.CircleGeometry(1.1,16),0x07080a,hx,.025,hz).rotation.x=-Math.PI/2;
+
+ /* 도시 코어 : 스모그 속에서 붉은 비상 윤곽만 보이다가, 복구되면 민트빛 링이 돈다 */
+ const core=new THREE.Group(),cg=kmat('coreGlass',{color:0x1e2532,roughness:.35,metalness:.6});
+ add(core,B(7,2.2,7),0x23262e,0,1.1,0);add(core,CY(2.2,2.2,26,6),cg,0,15.2,0).rotation.y=Math.PI/6;
+ add(core,CY(1.3,1.9,5,6),0x2a303c,0,30.7,0);add(core,CO(.75,6,6),0x2a303c,0,36.2,0);beacon(core,0,39.4,0,1);
+ const em=hf(0xff3d5a,.3),gE=B(.14,26,.14);for(let k=0;k<6;k++){const a=(30+k*60)*DEG;add(core,gE,em,Math.sin(a)*2.2,15.2,Math.cos(a)*2.2)}
+ const rings=[[9,3.9],[17,3.4],[25,2.9]].map((q,i)=>{const m=hf(0xff3d5a,.45),o=add(core,new THREE.TorusGeometry(q[1],.1,6,56,Math.PI*1.55),m,0,q[0],0);
+  o.rotation.set(Math.PI/2+(i===1?.38:0),i===1?.25:0,i*2);return {o,m}});
+ const bm=hf(0x3df5c4,0);add(core,new THREE.CylinderGeometry(.5,1.6,90,12,1,true),bm,0,84.4,0);lamp({t:1,op:[[bm,.18]]});
+ anims.push((tm,dt)=>{const on=PW.lv>=.999;em.color.setHex(on?0x3df5c4:PW.lv>=.5?0xffb340:0xff3d5a);em.opacity=on?.85:(Math.random()<.06?.05:.28);
+  rings.forEach((r,i)=>{r.m.color.setHex(on?0x3df5c4:0xff3d5a);r.m.opacity=on?.8:(Math.random()<.07?.06:.42);
+   if(on){r.o.rotation.z+=dt*(.5+i*.3)*(i%2?-1:1);r.o.rotation.x+=(Math.PI/2-r.o.rotation.x)*Math.min(1,dt*1.5);r.o.rotation.y*=Math.max(0,1-dt*1.5)}})});
+ W.add(at(core,0,24));
+
+ /* 끊어진 고가 철로 + 멈춘 열차 · 주변 건물 · 스카이라인 · 광고판 */
+ railLoop(W,18,7.5,22);train(W,18,8.5,76);
+ [[-150,15,5,13,3.6,3],[-115,14.5,6,9,3.6,4],[-82,15,4,11,3.6,2],[82,15,4,9.5,3.6,3],[112,14.5,5,12,3.6,0],[138,15,5,8,3.6,1],[188,15,6,10.5,3.6,2]].forEach(q=>tower(W,...q));
+ skyline(W,22,30,56,12,42,5);
+ billboard(W,-58,15.5,5.2,4.6,2.3,['SYSTEM ERROR','도시 기능률 17%'],['DONGNAE CITY','도시 기능 정상화'],1);
+ billboard(W,48,15.5,5.2,4.6,2.3,['LINK LOST','공동체 연결망 OFF'],['COMMUNITY','공동체 연결망 ON'],.6);
+ billboard(W,163,15.5,5,4.4,2.2,['DATA LOST','공공 유지 기록 78% 손실'],['RECORDS','공공 유지 기록 복구'],.8);
+
+ /* 광장 소품 : 가로등 · 경보등 · 통제선 · 추락한 드론 · 쓰레기 */
+ for(let i=0;i<8;i++)streetLamp(W,22.5+i*45,10,[.2,.4,.6,.8][i%4]);
+ pole(W,-18,12.5,6,1);pole(W,28,12.5,5,1);pole(W,222,12.5,6.5,1);
+ const stp=new THREE.MeshStandardMaterial({map:stripeTex(),roughness:.7});barrier(W,146,6.7,stp);barrier(W,160,6.7,stp);
+ const wreck=new THREE.Group();add(wreck,B(.62,.14,.62),0x2b303a,0,.14,0).rotation.z=.42;add(wreck,B(.5,.04,.08),0x2b303a,.42,.04,.3).rotation.y=.7;
+ const spk=halo(wreck,0xffa040,.7,.12,.3,0,0);anims.push(()=>{spk.material.opacity=Math.random()<.12?.9:0});W.add(at(wreck,118,5.4));lamp({t:1,hide:[wreck]});
+ debris(22,3,9,1);
+ R.map=cityMap(W,0,5.2);
+
+ /* 현재 : 짐을 들기 힘들어하는 사람, 그리고 그냥 지나치는 사람들 */
+ const [ex,ez]=wxz(-35,6.5),eld=person(W,{still:true,t:1,col:0x9a7b62,pos:[ex,ez,35*DEG]});eld.neck.remove(eld.phone);
+ const cb=mat(0x9c7a50),spill=new THREE.Group();W.add(spill);lamp({t:1,hide:[spill]});
+ [[.55,.2,.1,.3],[.15,.2,.68,1.1],[-.5,.17,.5,.5],[.9,.15,.62,0]].forEach(q=>{add(spill,B(.5,.4,.42),cb,ex+q[0],q[1],ez+q[2]).rotation.set(0,q[3],q[0]>.8?Math.PI/2:0)});
+ [[[-9,-7.6,8.5,-8.6],1.1,.6],[[-7.6,3.2,-6.2,-8.2],1,.8],[[7.2,4.6,6.1,-7.4],1.2,1],[[-8.5,6.4,8.2,7.2],.9,.8]].forEach(q=>person(W,{path:q[0],v:q[1],t:q[2]}));
+ person(W,{r:8.9,v:.9,dir:-1,t:1});
+
+ /* 과거 기록 영상 (FX.past 동안만 보임) : 함께 줍고, 나르고, 치우던 사람들 */
+ const past=new THREE.Group(),gm=hf(0xffc070,.5);past.visible=false;W.add(past);
+ ghost(past,ex+.75,ez+.8,Math.atan2(-.75,-.8),'bend',gm);ghost(past,ex-.6,ez+1,Math.atan2(.1,-.55),'bend',gm);
+ const [cx,cz]=wxz(24,7);ghost(past,cx,cz-.45,Math.PI/2,'pair',gm);ghost(past,cx,cz+.45,Math.PI/2,'pair',gm);add(past,B(.55,.42,1.35),gm,cx+.6,1.16,cz);
+ const [tx,tz]=wxz(-80,7);ghost(past,tx,tz,1.2,'bend',gm);add(past,IC(.24),gm,tx+.45,.24,tz+.25);
+ const [sx,sz]=wxz(62,6.4);ghost(past,sx,sz,-2.3,'bend',gm);
+ anims.push(tm=>{if(past.visible)gm.opacity=.42+.1*Math.sin(tm*8)-(Math.random()<.05?.25:0)});R.past=past;
+
+ /* 완전 복구 : 자원봉사자가 나타나고, 드론이 다시 난다 */
+ const vol=new THREE.Group();W.add(vol);lamp({t:1,vis:[vol]});
+ const v1=person(vol,{still:true,t:1,col:0x3df5c4,pos:[ex+.75,ez+.8,Math.atan2(-.75,-.8)]});add(v1.g,B(.46,.36,.4),cb,0,1.02,.36);
+ const [bx,bz]=wxz(110,5.8),v2=person(vol,{still:true,t:1,col:0x3df5c4,pos:[bx,bz,-1.6]});add(v2.g,B(.04,1.4,.04),0x8a6a40,.26,.72,.32).rotation.x=.45;
+ const dr=new THREE.Group();W.add(dr);lamp({t:1,vis:[dr]});[[12,9,.32,0],[14,12,-.25,2],[11.5,13.5,.2,4],[15,8,-.4,1]].forEach(q=>drone(dr,...q));
+
+ /* 엔딩 : 「자원봉사」 홀로그램 */
+ const wm=new THREE.MeshBasicMaterial({map:wordTex(),transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false});
+ const word=add(W,new THREE.PlaneGeometry(10,5),wm,0,11.5,-16);word.visible=false;R.word=word;R.wordMat=wm;
+ anims.push(tm=>{if(word.visible)word.position.y=11.5+Math.sin(tm*.8)*.15});
+
+ dust(260,0x8e8984,44,16,false);dust(140,0x3df5c4,40,14,true);unfog()};
+
+/* ================= 연출 효과 : 공통 · 프롤로그 · 엔딩 ================= */
+FX.alarm=()=>{$('alarm').classList.remove('hide');document.body.classList.add('alert');SFX.alarm()};
+FX.alarmOff=()=>{$('alarm').classList.add('hide');document.body.classList.remove('alert')};
+FX.online=()=>{$('agent').classList.add('on');$('agentTxt').textContent='LINK ONLINE · 조사요원';SFX.item()};
+FX.past=()=>{glitch();document.body.classList.add('past');showRec('ARCHIVE PLAYBACK · 과거 기록 영상');      // 과거: 도시가 살아 있던 모습
+ if(GL&&R.past){R.past.visible=true;setPower(1,true);tyaw=.45;tpitch=0}};
+FX.present=()=>{glitch();document.body.classList.remove('past');showRec('LIVE · 현재 동래구',true);            // 현재: 다시 붕괴 상태로
+ if(GL&&R.past){R.past.visible=false;setPower(0,true)}};
+FX.sites=()=>{hideRec();SFX.item();const M=R.map;if(!GL||!M)return;M.map.visible=true;M.nr.visible=false;tyaw=0;tpitch=.16;
+ const vs=M.pins.map(q=>wpos(q.top,0,.16,0)),sc=world;M.map.scale.y=.02;tween(.7,e=>{M.map.scale.y=.02+.98*e});
+ M.pins.forEach((q,i)=>setTimeout(()=>{if(world===sc)addTag(q.em,q.name,vs[i],q.unk?'unk':'')},350+i*260))};
+FX.timer=()=>{hideRec();document.body.classList.remove('past');S.running=true;updTimer();SFX.power()};
+FX.restore=()=>{glitch();SFX.power();hideRec();FX.alarmOff();document.body.classList.remove('past');
+ $('place').textContent='DONGNAE CITY · 중앙 광장';buildScene(-1);                                             // 엔딩은 첫 장소로 돌아온다
+ const M=R.map;if(!GL||!M||!R.word)return;M.on=true;M.map.visible=true;M.nr.visible=false;M.pins.forEach(q=>q.pm.color.setHex(0x3df5c4));
+ PW.rate=.32;setPower(1);yaw=.9;pitch=0;tyaw=0;tpitch=.26;R.word.visible=true;tween(2.2,e=>{R.wordMat.opacity=e},2.2)};
+FX.end=()=>{finish();return 'wait'};
+</script>
+
+<script>
+'use strict';
+/* ===== PART 3-B-2 : 장면 공용 도우미(2) · 동래읍성 장면 · 챕터 1 연출 ===== */
+
+/* 텍스처에 쓰는 한글 글꼴 미리 받기 (실패하면 시스템 글꼴로 대체) */
+(function(){try{if(!document.fonts||!document.fonts.load)return;
+ const t='自동래읍성시장온천천현재존재떡어묵과일채소생선반찬꽃국밥호떡빵함께사는잠시쉬어가세요필요한사람이먼저앉을수있도록청소참여자모집어르신이동지원행사준비도움요청나눠요무료감사합니다명외환경정화활동내용일시장소신청기록인원처교육안전배치관리사고보고서넘어짐담당자응급처치완료전장갑착용도구사용법비상연락처즉시알리기확인필수약속한시간에하고맡은역할을끝까지다하겠습니다급식운영재난복구봉사동행';
+ ['700 32px "Noto Sans KR"','900 32px "Noto Sans KR"'].forEach(f=>document.fonts.load(f,t).catch(()=>0))}catch(e){}})();
+
+/* ---------- 공용 도우미 (PART 4에서도 사용) ---------- */
+const FONT_KR='"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+function hmap(tex,op){return new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:op==null?.9:op,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false})}
+function view(deg,p){yaw=-deg*DEG;pitch=p||0;tyaw=tpitch=null;vyaw=0;if(camera)camera.position.set(0,1.7,0)}
+function glyphTex(ch,col){return canvasTex(128,128,x=>{x.textAlign='center';x.textBaseline='middle';x.shadowColor=col;x.shadowBlur=22;x.fillStyle='#fff';x.font='900 86px '+FONT_KR;x.fillText(ch,64,68)})}
+function panelTex(title,lines,col,w,h){w=w||256;h=h||128;return canvasTex(w,h,x=>{
+ x.fillStyle='rgba(255,255,255,.06)';x.fillRect(0,0,w,h);x.strokeStyle=col;x.lineWidth=3;x.strokeRect(3,3,w-6,h-6);
+ x.fillStyle=col;x.fillRect(3,3,w-6,28);x.fillStyle='#06100e';x.textBaseline='middle';x.font='700 16px "Chakra Petch",'+FONT_KR;x.fillText(title,11,18,w-22);
+ x.fillStyle=col;x.font='700 17px '+FONT_KR;const gap=(h-44)/Math.max(1,lines.length);lines.forEach((l,i)=>x.fillText(l,12,44+gap*(i+.5),w-24));
+ x.globalAlpha=.14;for(let y=0;y<h;y+=4)x.fillRect(0,y,w,1)})}
+function signTex(t,col,w){w=w||128;return canvasTex(w,64,x=>{x.textAlign='center';x.textBaseline='middle';x.shadowColor=col;x.shadowBlur=14;x.fillStyle='#fff';
+ x.font='900 38px '+FONT_KR;x.fillText(t,w/2,34,w-16);x.shadowBlur=0;x.strokeStyle=col;x.lineWidth=3;x.strokeRect(4,4,w-8,56)})}
+function burst(p,col,n,x,y,z,sp,up,life){if(!GL||RM)return;const pos=new Float32Array(n*3),vel=[];
+ for(let i=0;i<n;i++){pos[i*3]=x;pos[i*3+1]=y;pos[i*3+2]=z;vel.push([(Math.random()-.5)*sp,up*(.3+Math.random()),(Math.random()-.5)*sp])}
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+ const m=new THREE.PointsMaterial({map:haloTex,color:col,size:.3,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}),pt=new THREE.Points(geo,m),t0=performance.now(),L=(life||1.6)*1000;p.add(pt);
+ anims.push((tm,dt)=>{const e=(performance.now()-t0)/L;if(e>=1){p.remove(pt);geo.dispose();m.dispose();return 1}
+  for(let i=0;i<n;i++){const v=vel[i];v[1]-=dt*1.1;pos[i*3]+=v[0]*dt;pos[i*3+1]+=v[1]*dt;pos[i*3+2]+=v[2]*dt}
+  geo.attributes.position.needsUpdate=true;m.opacity=1-e;return 0})}
+function wave(p,col,x,y,z,flat,mx,d){if(!GL||RM)return;const m=hf(col,.8),o=add(p,new THREE.RingGeometry(.3,.38,40),m,x,y,z),t0=performance.now();if(flat)o.rotation.x=-Math.PI/2;
+ anims.push(()=>{const e=(performance.now()-t0)/(d*1000);if(e>=1){p.remove(o);o.geometry.dispose();m.dispose();return 1}o.scale.setScalar(1+e*mx);m.opacity=.8*(1-e);return 0})}
+function shake(d,a){if(!GL||RM)return;tween(d,e=>{const k=a*(1-e);camera.position.set((Math.random()-.5)*k,1.7+(Math.random()-.5)*k,(Math.random()-.5)*k)})}
+
+/* ================= 장면 0 : 동래읍성 — 깨진 문화유산 보호구역 ================= */
+SCN[0]=function(){resetWorld(PAL.fort);const W=world,D=CH[0].objs;
+ add(W,CY(80,80,.2,40),0x2b231e,0,-.1,0);add(W,new THREE.RingGeometry(2.8,9.6,56),0x3a312a,0,.012,0).rotation.x=-Math.PI/2;
+ /* 성곽 : 무너진 구간 · 강철 비계 · 꺼진 경관 조명(복구 60%에서 점등) */
+ const stone=mat(0x5f5751),stone2=mat(0x4b4541),steel=kmat('steel',{color:0x8d949e,metalness:.6,roughness:.4}),wl=neon(0xffb340);
+ const gS=B(3.5,4,1.1),gC=B(.9,.8,1.1),gR=B(3.3,1.4,1.2),gL=B(3.5,.06,.06),gP=B(.09,4.8,.09),gX=B(.06,5.2,.06),gD=B(3.1,.08,.5),gK=IC(.45),broken=[4,11,20,25];
+ ring(28,(i,d)=>{const w=new THREE.Group();
+  if(broken.includes(i)){add(w,gR,stone2,0,.7,0).rotation.z=.1;for(let k=0;k<4;k++)add(w,gK,stone,-1.4+k*.9,.25,.9+(k%2)*.5).rotation.set(k,k*2,0)}
+  else{add(w,gS,stone,0,2,0);add(w,gC,stone2,-1.05,4.4,0);if(i%2)add(w,gC,stone2,1.05,4.4,0);add(w,gL,wl,0,3.95,.58)}
+  if(i%4===1){add(w,gP,steel,-1.45,2.4,.95);add(w,gP,steel,1.45,2.4,.95);add(w,gX,steel,0,2.4,.95).rotation.z=.62;add(w,gX,steel,0,2.4,.95).rotation.z=-.62;add(w,gD,steel,0,2.2,1.1)}
+  W.add(at(w,d,15))});
+ lamp({t:.6,em:[[wl,1.3,0]]});
+ /* 누각 + 임시 강철 지지대 */
+ const pv=new THREE.Group(),wd=mat(0x5b3a24),rg=new THREE.Group();
+ [[-1.7,-.8],[1.7,-.8],[-1.7,.8],[1.7,.8]].forEach(q=>add(pv,CY(.15,.17,3.4,6),wd,q[0],1.7,q[1]));
+ add(pv,B(4.4,.4,2.3),0x4b2d1c,0,3.55,0);rg.position.y=4.55;rg.scale.set(1.25,1,.72);rg.rotation.z=.05;pv.add(rg);add(rg,CO(2.9,1.6,4),0x262c3a).rotation.y=Math.PI/4;
+ add(pv,B(.07,3.6,.07),steel,2.3,1.7,1.15).rotation.z=-.35;add(pv,B(.07,3.6,.07),steel,-2.3,1.7,1.15).rotation.z=.35;beacon(pv,0,3.95,1.25,.8,0xffd9a0);
+ W.add(at(pv,-62,12));
+ /* 문화유산 보호막 돔 : 붕괴 땐 붉은 조각만 깜빡이고, 완전 복구되면 민트빛 돔이 완성된다 */
+ const dR=hf(0xff3d5a,.12,true),dM=hf(0x3df5c4,0,true);
+ const dr=add(W,new THREE.SphereGeometry(23,26,9,0,Math.PI*1.3,0,Math.PI/2),dR);dr.rotation.y=2.2;
+ add(W,new THREE.SphereGeometry(23.3,26,9,0,Math.PI*2,0,Math.PI/2),dM);
+ anims.push((tm,dt)=>{const on=PW.lv>=.999;dR.opacity+=((on?0:Math.random()<.07?.02:.12)-dR.opacity)*Math.min(1,dt*8);dr.visible=dR.opacity>.012;dM.opacity+=((on?.2:PW.lv*.05)-dM.opacity)*Math.min(1,dt*1.5)});
+ [45,135,225,315].forEach((d,i)=>{const g=new THREE.Group(),tm=neon(0x3df5c4),t=[.4,.6,.8,1][i];add(g,CY(.25,.45,8,6),0x30353f,0,4,0);add(g,SP(.5,8),tm,0,8.3,0);beacon(g,0,9.1,0,t);lamp({t,em:[[tm,1.6,0]]});W.add(at(g,d,21))});
+ /* 붉은 경보등 → 복구되면 따뜻한 가로등 */
+ [[-60,9.5,.2],[0,9.8,.4],[55,9.5,.6],[110,9.5,.8],[170,9.5,1],[250,9.5,.6]].forEach(q=>{const g=new THREE.Group();add(g,CY(.06,.08,3.6,6),0x3a3f4a,0,1.8,0);add(g,B(.34,.3,.34),0x2a2f38,0,3.72,0);
+  beacon(g,0,3.8,0,q[2],0xffd9a0);const pm=pool(g,0xffcf8a,2.3,0,0);lamp({t:q[2],op:[[pm,.5]]});W.add(at(g,q[0],q[1]))});
+ skyline(W,20,30,56,12,40,11);
+ billboard(W,105,13,5.6,4.6,2.3,['HERITAGE ALERT','문화유산 보호막 OFF'],['DONGNAE-EUPSEONG','문화유산 보호막 ON'],1);
+ debris(16,3,9,.6);debris(14,3,9,1);
+ /* 무너진 성곽을 바라보고 그냥 지나가는 사람들 → 완전 복구되면 고치고 줍는 사람이 나타난다 */
+ person(W,{path:[-8,6,8,7.4],v:.9,t:.6});person(W,{path:[7,-8.6,-7.5,-7],v:.8,t:.8});person(W,{r:12,v:.8,dir:-1,t:1});
+ const vol=new THREE.Group();W.add(vol);lamp({t:1,vis:[vol]});
+ const [ax,az]=wxz(51,13.3),v1=person(vol,{still:true,t:1,col:0x3df5c4,pos:[ax,az,Math.PI-51*DEG]});add(v1.g,B(.05,.05,.8),0x8a8f98,.26,1.05,.42);
+ const [cx,cz]=wxz(-100,6.2),v2=person(vol,{still:true,t:1,col:0xffb340,pos:[cx,cz,100*DEG]});add(v2.g,B(.3,.4,.22),0x2f6b3e,.32,.7,.1);
+
+ /* ① 찢어진 깃발 : 찢긴 부분을 홀로그램이 채운다 */
+ {const g=new THREE.Group(),fg=new THREE.Group(),cl=mat(0x8f2b26),fh=hf(0x3df5c4,0),fe=neon(0x3df5c4,0x2a2f38);
+  add(g,CY(.07,.1,4.5,6),0x70767f,0,2.25,0);add(g,SP(.16),0x9aa1ab,0,4.55,0);fg.position.y=3.55;g.add(fg);
+  add(fg,B(1.15,1.5,.05),cl,.62,0,0);add(fg,B(.62,.62,.05),cl,1.5,.44,0).rotation.z=-.22;add(fg,new THREE.TorusGeometry(.26,.05,6,18),0xd9c9a0,.62,0,.04);
+  add(fg,B(1,1.5,.03),fh,1.7,0,0);add(g,CY(.38,.48,.22,10),fe,0,.11,0);lamp({t:.2,op:[[fh,.42]],em:[[fe,1.3,0]]});
+  anims.push(tm=>{fg.rotation.y=Math.sin(tm*1.3)*.16;fg.rotation.z=Math.sin(tm*2.1)*.02});addObj(D[0],g,-25,5.6,0,4.9)}
+ /* ② 금이 간 비석 : 기록 장치에 「선택의 기록」을 넣으면 빛난다 */
+ {const g=new THREE.Group(),sm=neon(0x3df5c4,0x77736e),dv=neon(0xff3d5a,0x22262e),ST={g,sm,dv,on:false};
+  add(g,B(1.8,.34,1),0x47423f,0,.17,0);add(g,B(1.2,2,.32),0x8d8a86,0,1.34,0);add(g,B(.04,1.3,.34),0x1b1b1b,.2,1.45,0).rotation.z=.42;
+  for(let k=0;k<6;k++)add(g,B(k%2?.55:.75,.05,.02),sm,-.04,1.98-k*.2,.17);add(g,B(.5,.2,.12),dv,0,.6,.2);
+  R.stele=ST;anims.push(tm=>{if(!ST.on)dv.emissiveIntensity=Math.sin(tm*5)>0?1.2:.15});addObj(D[1],g,30,6,0,2.7)}
+ /* ③ 돌문 : 새겨진 문양이 현재 동래구 지도와 겹쳐진다 */
+ {const g=new THREE.Group(),ds=mat(0x6f6862),dm=neon(0x3df5c4,0x2b3a36),mh=hf(0x3df5c4,0),pts=[[-.55,2.3],[.35,2.05],[-.15,1.62],[.55,1.2],[-.42,.92],[.12,.55]];
+  add(g,B(.6,3,.6),ds,-1.3,1.5,0);add(g,B(.6,3,.6),ds,1.3,1.5,0);add(g,B(3.4,.6,.8),0x5f5852,0,3.2,0);add(g,B(2,2.9,.2),0x857d75,0,1.45,0);
+  pts.forEach(q=>add(g,B(.18,.18,.06),dm,q[0],q[1],.12));dm.emissiveIntensity=.12;
+  for(let k=0;k<pts.length-1;k++){const a=pts[k],b=pts[k+1];add(g,B(Math.hypot(b[0]-a[0],b[1]-a[1]),.035,.01),mh,(a[0]+b[0])/2,(a[1]+b[1])/2,.16).rotation.z=Math.atan2(b[1]-a[1],b[0]-a[0])}
+  const mp=add(g,new THREE.PlaneGeometry(2.4,1.2),hmap(panelTex('OLD MAP ↔ NOW',['동래읍성 · EXIST','동래시장 · EXIST','온천천 · EXIST'],'#3df5c4'),0),0,1.15,.95);mp.visible=false;
+  R.map1={g,dm,mh,mp};addObj(D[2],g,82,7.5,0,3.9)}
+ /* ④ 잠긴 기록함 : 전자 잠금장치 → 열리면 종이 기록과 「自」 조각 */
+ {const g=new THREE.Group(),lid=new THREE.Group(),lk=neon(0xff3d5a,0x22262e),pap=new THREE.Group(),pm=mat(0xefe6cf),gm=hmap(glyphTex('自','#3df5c4'),0);
+  add(g,B(1.3,.74,.85),0x5f3a22,0,.37,0);lid.position.set(0,.74,-.42);g.add(lid);add(lid,B(1.34,.24,.88),0x6f4428,0,.12,.43);
+  add(g,B(1.36,.09,.88),0xb08a3a,0,.6,0);add(g,B(.34,.26,.06),lk,0,.48,.45);
+  pap.visible=false;g.add(pap);for(let k=0;k<6;k++)add(pap,B(.26,.012,.32),pm,(k%3-1)*.34,.76,k<3?-.14:.14).rotation.y=(k-2.5)*.15;
+  const gl=add(g,new THREE.PlaneGeometry(.8,.8),gm,0,1.25,.1),CS={g,lid,lk,pap,gl,gm,open:false};gl.visible=false;R.chest=CS;
+  anims.push(tm=>{if(!CS.open)lk.emissiveIntensity=Math.sin(tm*4)>0?1.3:.15;else{gl.position.y=1.25+Math.sin(tm*1.6)*.06;gl.rotation.y=Math.sin(tm*.9)*.4}});
+  addObj(D[3],g,140,5.2,0,1.6)}
+ /* ⑤ 봉인된 돌문 : 「自」 조각을 끼우면 봉인이 풀리고 문이 내려간다 */
+ {const g=new THREE.Group(),gs=mat(0x4f4945),door=new THREE.Group(),sl=neon(0xff3d5a,0x1b1d22),rm=hf(0xff3d5a,.85),sk=hmap(glyphTex('自','#3df5c4'),0),pv2=hf(0x3df5c4,0);
+  add(g,B(1,4.6,1),gs,-2.1,2.3,0);add(g,B(1,4.6,1),gs,2.1,2.3,0);add(g,B(5.4,.9,1.2),0x433d3a,0,4.9,0);add(g,B(5.6,.12,.14),steel,0,4.38,.62);
+  g.add(door);add(door,B(3.2,4.4,.35),0x2c2f35,0,2.2,0);add(door,B(3.02,.05,.37),sl,0,1.1,0);add(door,B(3.02,.05,.37),sl,0,3.3,0);
+  const sr=add(door,new THREE.TorusGeometry(.42,.06,6,28),rm,0,2.3,.21);add(door,new THREE.PlaneGeometry(.62,.62),sk,0,2.3,.22);add(g,new THREE.PlaneGeometry(3.2,4.4),pv2,0,2.2,-.3);
+  const GT={g,door,sl,rm,sk,pv:pv2,sock:false};R.gate=GT;
+  anims.push(tm=>{sr.rotation.z=tm*(GT.sock?1.6:.4);if(!GT.sock){rm.opacity=.5+.35*Math.sin(tm*4);sl.emissiveIntensity=.3+.3*Math.sin(tm*4)}});
+  addObj(D[4],g,215,10,0,5.6)}
+ dust(220,0x9b8b7b,44,15,false);dust(110,0x3df5c4,40,13,true);unfog();view(-14,.03)};
+
+/* ================= 연출 : 챕터 1 ================= */
+FX.stele=()=>{SFX.item();const s=R.stele;if(!GL||!s)return;s.on=true;s.dv.emissive.setHex(0x3df5c4);s.dv.emissiveIntensity=1.4;fadeTo(s.sm,'emissiveIntensity',1.7,1.2);
+ const h=halo(s.g,0x3df5c4,3.4,0,1.4,.4,0);tween(1.4,e=>{h.material.opacity=.85*Math.sin(e*Math.PI)+.18*e});burst(s.g,0x3df5c4,26,0,1.4,.3,1.6,1.4)};
+FX.mapGlow=()=>{SFX.item();const m=R.map1;if(!GL||!m)return;fadeTo(m.dm,'emissiveIntensity',1.8,1);fadeTo(m.mh,'opacity',.9,1.2);
+ m.mp.visible=true;tween(.8,e=>{m.mp.scale.set(.2+.8*e,.2+.8*e,1);m.mp.material.opacity=.8*e},.4)};
+FX.chestOpen=()=>{SFX.open();const c=R.chest;if(!GL||!c)return;c.open=true;c.lk.emissive.setHex(0x3df5c4);c.lk.emissiveIntensity=1.2;
+ tween(1.1,e=>{c.lid.rotation.x=-1.9*e});c.pap.visible=c.gl.visible=true;fadeTo(c.gm,'opacity',1,1.2);
+ const h=halo(c.g,0xffd27a,2.6,0,.9,0,0);tween(1.6,e=>{h.material.opacity=.8*Math.sin(e*Math.PI)});burst(c.g,0xffd27a,30,0,.8,0,1.4,2)};
+FX.socket=()=>{SFX.item();const G=R.gate;if(!GL||!G)return;G.sock=true;G.rm.color.setHex(0x3df5c4);G.rm.opacity=.9;G.sl.emissive.setHex(0x3df5c4);
+ fadeTo(G.sl,'emissiveIntensity',1.4,.8);fadeTo(G.sk,'opacity',1,.8);burst(G.door,0x3df5c4,24,0,2.3,.3,1.2,1)};
+FX.doorOpen=()=>{SFX.open();const G=R.gate;if(!GL||!G)return;shake(1.6,.05);tween(2.6,e=>{G.door.position.y=-4.7*e});fadeTo(G.pv,'opacity',.6,2.6);
+ const h=halo(G.g,0x3df5c4,6,0,2.2,-.2,0);tween(2.6,e=>{h.material.opacity=.7*e})};
+</script>
+
+<script>
+'use strict';
+/* ===== PART 4-A : 동래시장 — 꺼진 네온 야시장 · 챕터 2 연출 ===== */
+function boardTex(){return canvasTex(512,256,(x,w,h)=>{x.fillStyle='#3a2f28';x.fillRect(0,0,w,h);x.textAlign='center';
+ [['시장 청소 참여자 모집','#f5f0e1',18,16],['어르신 이동 지원','#ffe08a',190,22],['행사 준비 도움 요청','#d0e8ff',362,14],['함께 나눠요 · 무료','#ffd0d8',22,148],['감사합니다!','#f5f0e1',360,150]].forEach((n,i)=>{
+  x.save();x.translate(n[2]+65,n[3]+45);x.rotate((i%2?1:-1)*.04);x.fillStyle=n[1];x.fillRect(-65,-45,130,90);x.fillStyle='#e04848';x.beginPath();x.arc(0,-37,4,0,7);x.fill();
+  x.fillStyle='#2b2b2b';x.font='700 15px '+FONT_KR;x.fillText(n[0],0,-4,120);x.fillStyle='#666';x.font='500 11px '+FONT_KR;x.fillText('참여 : 김○○ 외 12명',0,22,120);x.restore()});
+ x.save();x.translate(256,178);x.fillStyle='#fff';x.fillRect(-62,-50,124,100);x.fillStyle='#8fc7e8';x.fillRect(-54,-42,108,72);   // 돕는 사람과 도움받은 사람이 함께 웃는 사진
+ [[-22,'#3df5c4'],[22,'#ffb340']].forEach(p=>{x.fillStyle=p[1];x.beginPath();x.arc(p[0],-14,11,0,7);x.fill();x.fillRect(p[0]-12,-1,24,30);x.strokeStyle='#222';x.lineWidth=2;x.beginPath();x.arc(p[0],-14,6,.25,Math.PI-.25);x.stroke()});x.restore()})}
+
+SCN[1]=function(){resetWorld(PAL.market);const W=world,D=CH[1].objs;
+ add(W,CY(80,80,.2,40),0x221f27,0,-.1,0);add(W,new THREE.RingGeometry(2.5,10.8,48),0x2d2933,0,.012,0).rotation.x=-Math.PI/2;
+ /* 노점 10곳 : 복구 단계마다 네온 간판이 하나씩 켜진다 */
+ const aw=[0xb03a30,0x2d5fbf,0xc9a020,0x2a8f55,0xc05a10,0x7a3f9a],fc=[0xff7043,0x9ccc65,0xffca28,0xef5350],nm=['떡','어묵','과일','채소','생선','반찬','꽃','국밥','호떡','빵'];
+ const gT=B(3,1.1,1.4),gP=B(.12,2.7,.12),gA=B(3.3,.12,1.9),gF=SP(.18),gN=B(2.6,.07,.07),gS=new THREE.PlaneGeometry(1.3,.65);
+ ring(10,(i,d)=>{const s=new THREE.Group(),c=WCOL[i%6],ne=neon(c),sm=hmap(signTex(nm[i],'#'+c.toString(16).padStart(6,'0')),.08);sm.color.setHex(c);
+  add(s,gT,0x4f3a2c,0,.55,0);add(s,gP,0x2c2f36,-1.45,1.35,.6);add(s,gP,0x2c2f36,1.45,1.35,.6);add(s,gA,aw[i%6],0,2.65,.25).rotation.x=.25;
+  for(let k=0;k<4;k++)add(s,gF,fc[k],-1+k*.65,1.25,.2);add(s,gN,ne,0,2.36,1.1);add(s,gS,sm,0,3.35,.35);
+  lamp({t:[.2,.4,.6,.8,1][i%5],em:[[ne,1.7,0]],fn:k=>{sm.opacity=.08+.87*k}});W.add(at(s,d+18,12.5))});
+ /* 줄전구 : 복구 80%에서 켜진다 */
+ const bp=[],ls=[],gPl=CY(.05,.05,4.6,4);
+ for(let s=0;s<5;s++){const a=(s*72+10)*DEG,b=a+150*DEG,P=u=>[11.2*(Math.sin(a)*(1-u)+Math.sin(b)*u),4.5-Math.sin(u*Math.PI)*1.1,-11.2*(Math.cos(a)*(1-u)+Math.cos(b)*u)];
+  for(let k=0;k<16;k++){const p=P(k/16),q=P((k+1)/16);ls.push(...p,...q);if(k)bp.push(...p)}
+  [a,b].forEach(r=>add(W,gPl,0x2c2f36,Math.sin(r)*11.2,2.3,-Math.cos(r)*11.2))}
+ const lg=new THREE.BufferGeometry(),bg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.Float32BufferAttribute(ls,3));bg.setAttribute('position',new THREE.Float32BufferAttribute(bp,3));
+ W.add(new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:0x15151a})));
+ const off=new THREE.Points(bg,new THREE.PointsMaterial({color:0x55525a,size:.13})),onM=new THREE.PointsMaterial({map:haloTex,color:0xffd27a,size:.8,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
+ W.add(off);W.add(new THREE.Points(bg,onM));lamp({t:.8,op:[[onM,1]],hide:[off]});
+ /* 쓰러진 배송 로봇 : 복구 40%에서 다시 일어선다 */
+ const rb=new THREE.Group(),bd=new THREE.Group(),re=neon(0xff3d5a,0x101318),gw=CY(.14,.14,.1,10);rb.add(bd);
+ add(bd,B(.8,.62,1),0xd4d9e0,0,.6,0);add(bd,B(.84,.08,1.04),0x2b303a,0,.32,0);add(bd,B(.5,.16,.04),re,0,.74,.51);add(bd,CY(.015,.015,.5,4),0x9aa1ab,.3,1.15,-.3);
+ [[-.38,-.34],[.38,-.34],[-.38,.34],[.38,.34]].forEach(q=>add(bd,gw,0x1d2026,q[0],.16,q[1]).rotation.z=Math.PI/2);
+ bd.rotation.z=Math.PI/2;bd.position.y=.42;W.add(at(rb,54,6.6));
+ anims.push((tm,dt)=>{const on=PW.lv>=.4-1e-4;bd.rotation.z+=((on?0:Math.PI/2)-bd.rotation.z)*Math.min(1,dt*2.5);bd.position.y=.42*bd.rotation.z/(Math.PI/2);
+  re.emissive.setHex(on?0x3df5c4:0xff3d5a);re.emissiveIntensity=on?1.4:(Math.sin(tm*6)>0?1.1:.1)});
+ /* 짐이 무거운 어르신 : 모두 지나치지만, 복구 60%에서 돕는 사람이 나타난다 */
+ const [ex,ez]=wxz(205,7.2),eld=person(W,{still:true,t:1,col:0x8a7060,pos:[ex,ez,-205*DEG]}),bags=new THREE.Group(),hp=new THREE.Group(),bgm=mat(0x6b8f4e);eld.neck.remove(eld.phone);
+ W.add(bags);W.add(hp);[[.45,.25],[-.4,.35],[.1,.55]].forEach(q=>add(bags,B(.35,.42,.25),bgm,ex+q[0],.21,ez+q[1]));lamp({t:.6,hide:[bags],vis:[hp]});
+ const h1=person(hp,{still:true,t:.6,col:0x3df5c4,pos:[ex+.85,ez+.35,-205*DEG]});add(h1.g,B(.4,.42,.3),bgm,0,1,.34);
+ [[[-9,-6,9,-7.5],1.1,.4],[[8.5,5.5,-8,6.5],1,.6],[[-6.5,8.5,-7,-8],.9,.6],[[6.8,-8.5,7.5,8],1.2,.8]].forEach(q=>person(W,{path:q[0],v:q[1],t:q[2]}));person(W,{r:9.6,v:.9,t:1});
+ const vol=new THREE.Group();W.add(vol);lamp({t:1,vis:[vol]});
+ [[-35,6.2],[60,7.4]].forEach(q=>{const [x,z]=wxz(q[0],q[1]),v=person(vol,{still:true,t:1,col:0x3df5c4,pos:[x,z,-q[0]*DEG]});add(v.g,B(.3,.4,.22),0x2f6b3e,.32,.7,.1)});
+ /* 시장 입구 아치 : 완전 복구되면 「동래시장」 간판이 켜진다 */
+ const ar=new THREE.Group(),an=neon(0xff9a5c),asg=hmap(signTex('동래시장','#ff9a5c',256),.06);asg.color.setHex(0xffc79a);
+ add(ar,B(.45,5.4,.45),0x2c2f36,-3.3,2.7,0);add(ar,B(.45,5.4,.45),0x2c2f36,3.3,2.7,0);add(ar,B(7.2,.7,.5),0x23262d,0,5.35,0);add(ar,B(7,.06,.06),an,0,4.95,.28);
+ add(ar,new THREE.PlaneGeometry(4.2,1.05),asg,0,5.35,.3);lamp({t:1,em:[[an,1.7,0]],fn:k=>{asg.opacity=.06+.89*k}});W.add(at(ar,180,14));
+ billboard(W,-120,16,6.4,4.6,2.3,['LINK LOST','공동체 연결률 3%'],['DONGNAE MARKET','공동체 연결망 ON'],1);
+ skyline(W,20,26,50,10,34,7);debris(20,3,9,.6);debris(12,3,9,1);
+ /* 과거 기록 영상(FX.replay) : 함께 상자를 나르고, 어르신을 돕던 사람들 */
+ const rp=new THREE.Group(),gm=hf(0xffc070,.5),[bx,bz]=wxz(40,5.5),[qx,qz]=wxz(22,4),[tx,tz]=wxz(-25,5);rp.visible=false;W.add(rp);
+ ghost(rp,bx-.9,bz+.6,Math.PI/2,'carry',gm);ghost(rp,bx+.9,bz+.5,-Math.PI/2,'carry',gm);ghost(rp,qx,qz,2.4,'carry',gm);
+ ghost(rp,ex+.8,ez+.3,-205*DEG,'pair',gm);ghost(rp,tx+.7,tz+.3,-1.2,'bend',gm);
+ anims.push(tm=>{if(rp.visible)gm.opacity=.42+.1*Math.sin(tm*8)-(Math.random()<.05?.25:0)});R.replay=rp;
+
+ /* ① 쓰러진 쓰레기통 (스마트 수거함) */
+ {const g=new THREE.Group(),bb=new THREE.Group(),bs=neon(0xff3d5a,0x16191f),tr=new THREE.Group(),TC=[0xd8d2c0,0x7f9aaf,0xb98a5a],BN={bb,bs,tr,up:false};
+  g.add(bb);add(bb,CY(.42,.36,1.1,10),0x3f6e5a,0,.55,0);add(bb,CY(.45,.45,.1,10),0x2a2f38,0,1.12,0);add(bb,B(.34,.22,.05),bs,0,.72,.4);bb.rotation.z=-Math.PI/2;bb.position.set(-.55,.42,0);
+  g.add(tr);for(let k=0;k<9;k++)add(tr,k%3?B(.26,.06,.22):CY(.06,.06,.22,6),TC[k%3],.9+Math.random()*1.1,.04,(Math.random()-.5)*1.4).rotation.y=Math.random()*3;
+  R.bin=BN;anims.push(tm=>{if(!BN.up)bs.emissiveIntensity=Math.sin(tm*5)>0?1:.1});addObj(D[0],g,-25,5,0,1.8)}
+ /* ② 쓰러진 상자 */
+ {const g=new THREE.Group(),cb=mat(0xb58a55),gb=B(.7,.6,.6);
+  [[0,.3,0,0],[.75,.3,.2,.5],[-.6,.3,-.1,-.3],[.2,.9,0,.2],[1.15,.3,-.5,1.1]].forEach(q=>add(g,gb,cb,q[0],q[1],q[2]).rotation.set(q[3]*.3,q[3],q[3]*.2));
+  add(g,B(.4,.01,.3),0xf3efe4,0,.61,.05);addObj(D[1],g,40,5.5,0,1.9)}
+ /* ③ 오래된 게시판 */
+ {const g=new THREE.Group(),fr=neon(0x3df5c4,0x2a2f38),bmt=new THREE.MeshBasicMaterial({map:boardTex(),color:0x777777});
+  add(g,B(.12,2.8,.12),0x3a3f4a,-1.45,1.4,0);add(g,B(.12,2.8,.12),0x3a3f4a,1.45,1.4,0);add(g,B(2.9,1.55,.1),0x2a2f38,0,1.95,-.06);
+  add(g,new THREE.PlaneGeometry(2.7,1.35),bmt,0,1.95,0);add(g,B(2.9,.05,.05),fr,0,2.74,.02);add(g,B(2.9,.05,.05),fr,0,1.16,.02);
+  lamp({t:.6,em:[[fr,1.4,0]],fn:k=>{bmt.color.setScalar(.47+.53*k)}});R.board={g};addObj(D[2],g,110,7,0,3.1)}
+ /* ④ 빛을 잃은 전구 */
+ {const g=new THREE.Group(),bm=mat(0x6c6a63,{emissive:0xffd54f,emissiveIntensity:0,roughness:.35}),pl=new THREE.PointLight(0xffd27a,0,10,2);
+  add(g,CY(.05,.06,3.3,6),0x333840,0,1.65,0);add(g,B(1,.05,.05),0x333840,.48,3.3,0);add(g,CY(.015,.015,.3,4),0x555a60,.95,3.13,0);add(g,CY(.1,.12,.16,8),0x8a8f98,.95,3.02,0);add(g,SP(.26,12),bm,.95,2.8,0);
+  const bh=halo(g,0xffd27a,2.8,.95,2.8,0,0),bpm=pool(g,0xffcf80,3.2,.95,0);pl.position.set(.95,2.6,.4);g.add(pl);R.bulb={bm,bh,bpm,pl};addObj(D[3],g,175,5.5,0,3.6)}
+ /* ⑤ 버려진 의자 */
+ {const g=new THREE.Group(),ch=new THREE.Group(),wd=mat(0x7a4f2a),nt=hmap(panelTex('NOTICE',['잠시 쉬어가세요.','필요한 사람이 먼저','앉을 수 있도록!'],'#ffb340'),.35);
+  g.add(ch);add(ch,B(.95,.08,.9),wd,0,.6,0);add(ch,B(.95,.8,.08),wd,0,1,-.42);[[-.4,-.38],[.4,-.38],[-.4,.38],[.4,.38]].forEach(q=>add(ch,B(.07,.6,.07),0x3a3f4a,q[0],.3,q[1]));ch.rotation.z=.12;
+  add(g,new THREE.PlaneGeometry(1.2,.6),nt,0,1.85,-.3);lamp({t:1,fn:k=>{ch.rotation.z=.12*(1-k);nt.opacity=.35+.6*k}});addObj(D[4],g,250,6,0,2.45)}
+ dust(200,0x8f86a0,44,14,false);dust(110,0xffd27a,40,12,true);unfog();view(-15,.03)};
+
+/* ================= 연출 : 챕터 2 ================= */
+FX.binUp=()=>{SFX.item();const b=R.bin;if(!GL||!b)return;b.up=true;b.bs.emissive.setHex(0x3df5c4);b.bs.emissiveIntensity=1.3;
+ tween(1,e=>{b.bb.rotation.z=-Math.PI/2*(1-e);b.bb.position.set(-.55*(1-e),.42*(1-e),0)});
+ tween(.8,e=>{b.tr.scale.setScalar(Math.max(.001,1-e));if(e>=1)b.tr.visible=false},.7)};
+FX.replay=()=>{glitch();document.body.classList.add('past');showRec('ARCHIVE PLAYBACK · 동래시장 기록');$('goal').classList.add('hide');   // 목표 표시와 겹치지 않게 잠시 숨김
+ if(GL&&R.replay){R.replay.visible=true;setPower(1,true)}};
+FX.replayOff=()=>{glitch();document.body.classList.remove('past');hideRec();if(GL&&R.replay){R.replay.visible=false;setPower(S.next/5,true)}};
+FX.board=()=>{SFX.item();const b=R.board;if(!GL||!b)return;addTag('LINK','공동체 연결률 3% → 37%',wpos(b.g,0,.65,.4),'',7000);burst(b.g,0x3df5c4,24,0,1.95,.3,2.2,1)};
+FX.bulb=()=>{SFX.power();const b=R.bulb;if(!GL||!b)return;b.bm.color.setHex(0xfff3b0);
+ tween(1.4,e=>{const k=e<.8?(Math.random()<.5?1:.08):1;b.bm.emissiveIntensity=1.8*k;b.bh.material.opacity=.9*k;b.bpm.opacity=.55*k;b.pl.intensity=2*k})};
+</script>
+ 
+<script>
+'use strict';
+/* ===== PART 4-B : 온천천 — 독성 하천 · 끊어진 고가 철로 · 벚꽃 · 챕터 3 연출 ===== */
+(function(){try{if(document.fonts&&document.fonts.load)['700 32px "Noto Sans KR"','900 32px "Noto Sans KR"'].forEach(f=>document.fonts.load(f,'박람회센터물주변상태발림대는').catch(()=>0))}catch(e){}})();
+function polar(x,z){return [Math.atan2(x,-z)/DEG,Math.hypot(x,z)]}                       // 평면 좌표 → (각도, 거리)
+function bareTree(p,x,z,s,t,pk){const g=new THREE.Group(),bk=mat(0x3b2c22),bl=new THREE.Group();g.position.set(x,0,z);   // 앙상한 나무 + 벚꽃
+ add(g,CY(.1*s,.17*s,2.2*s,6),bk,0,1.1*s,0);
+ [[.5,-.5,0],[-.45,.55,0],[0,.1,.5]].forEach(q=>add(g,B(.07*s,1.5*s,.07*s),bk,q[0]*s,2.6*s,q[2]*s).rotation.set(q[2]*.8,0,q[1]));
+ [[.9,3.3,0,.55],[-.85,3.3,0,.55],[0,3.25,.8,.5],[0,3.7,0,.65]].forEach(q=>add(bl,IC(q[3]*s,1),pk,q[0]*s,q[1]*s,q[2]*s));
+ bl.visible=false;g.add(bl);p.add(g);if(t)lamp({t,vis:[bl]});return {g,bl}}
+
+SCN[2]=function(){resetWorld(PAL.stream);const W=world,D=CH[2].objs,pk=mat(0xffa6c9,{emissive:0xff5c9a,emissiveIntensity:.35,roughness:.6});
+ add(W,CY(80,80,.2,40),0x252a1f,0,-.1,0);add(W,B(140,.03,3.2),0x4a4640,0,.015,-2.4);add(W,B(140,.03,2.4),0x4a4640,0,.015,-11.2);
+ const led=neon(0x3df5c4);add(W,B(140,.04,.08),led,0,.04,-3.95);lamp({t:.4,em:[[led,1.4,0]]});
+ const holes=new THREE.Group(),hmt=mat(0x1c1a17);W.add(holes);lamp({t:.6,hide:[holes]});              // 훼손된 산책로 → 60%에서 보수
+ for(let x=-24;x<=24;x+=6)add(holes,B(1.3,.04,1.1),hmt,x+1.3,.03,-2.2+(x%12?.5:-.4)).rotation.y=x*.3;
+ /* 하천 : 독성 녹색 → 복구율만큼 맑은 파랑으로 */
+ const wt=canvasTex(64,64,(x,w,h)=>{x.fillStyle='#8a8a8a';x.fillRect(0,0,w,h);x.globalAlpha=.4;for(let i=0;i<24;i++){x.fillStyle=i%2?'#ffffff':'#3a3a3a';x.fillRect(Math.random()*w,Math.random()*h,8+Math.random()*18,2)}});
+ wt.wrapS=wt.wrapT=THREE.RepeatWrapping;wt.repeat.set(30,1.4);
+ const wm=new THREE.MeshStandardMaterial({map:wt,color:0x5b7a1c,emissive:0x3c6a08,emissiveIntensity:.45,roughness:.25,metalness:.2});add(W,B(140,.06,5),wm,0,.03,-7);
+ const c0=new THREE.Color(0x5b7a1c),c1=new THREE.Color(0x3a9ad6),e0=new THREE.Color(0x3c6a08),e1=new THREE.Color(0x0b3c5c);
+ anims.push(tm=>{wt.offset.x=-tm*.04;wm.color.copy(c0).lerp(c1,PW.lv);wm.emissive.copy(e0).lerp(e1,PW.lv);wm.emissiveIntensity=.45-.25*PW.lv});
+ const cu=mat(0x6a6660);add(W,B(140,.3,.35),cu,0,.15,-4.4);add(W,B(140,.3,.35),cu,0,.15,-9.6);
+ /* 떠다니는 쓰레기 · 독성 거품 · 오수 배출구 (80%에서 사라짐) */
+ const flo=new THREE.Group(),gb=glow(0x9dff3a,.7);W.add(flo);lamp({t:.8,hide:[flo]});
+ for(let i=0;i<28;i++){const k=i%3,o=add(flo,k?IC(.1+Math.random()*.1):B(.3,.06,.22),k===1?gb:[0xd8d2c0,0x7f9aaf,0xb98a5a][i%3],(Math.random()-.5)*42,.07,-7+(Math.random()-.5)*4);o.userData.ph=Math.random()*6}
+ anims.push(tm=>{if(flo.visible)flo.children.forEach(o=>{o.position.y=.07+Math.sin(tm*1.5+o.userData.ph)*.03})});
+ const pp=new THREE.Group(),sl=hf(0x9dff3a,.55);add(pp,CY(.7,.7,1.2,10),0x50555e).rotation.x=Math.PI/2;add(pp,CY(.55,.55,1.25,10),0x101214).rotation.x=Math.PI/2;
+ const sf=add(pp,new THREE.PlaneGeometry(.8,1.1),sl,0,-.55,.7);sf.rotation.x=-.25;pp.position.set(-13,.75,-10.1);W.add(pp);lamp({t:.8,hide:[sf]});anims.push(tm=>{sl.opacity=.4+.15*Math.sin(tm*6)});
+ /* 끊어진 고가 자기부상 철로 → 완전 복구되면 홀로그램 다리로 이어지고 열차가 달린다 */
+ const st=mat(0x3b414c,{metalness:.5,roughness:.5}),rs=neon(0x66ccff),bm=hf(0x3df5c4,0),pm=mat(0x30353f),gc=CY(.35,.45,7.7,6);
+ [[-60,-2],[5,60]].forEach(q=>{const L=q[1]-q[0],cx=(q[0]+q[1])/2;add(W,B(L,.7,1.2),st,cx,8,-16);add(W,B(L,.08,.12),rs,cx,8.4,-16);for(let x=q[0]+3;x<q[1];x+=8)add(W,gc,pm,x,3.85,-16)});
+ add(W,B(7,.7,1.2),bm,1.5,8,-16);const dg=add(W,B(3.6,.55,1.1),st,-.47,7.06,-16);dg.rotation.z=-.55;lamp({t:.8,em:[[rs,1.5,0]]});lamp({t:1,op:[[bm,.5]],hide:[dg]});
+ const wh=mat(0xcfd6e0,{roughness:.4,metalness:.3}),win=neon(0x9fdcff,0x16202b),tr=new THREE.Group();
+ for(let i=0;i<3;i++){add(tr,B(5,1.15,1.35),wh,-i*5.35,0,0);add(tr,B(4.6,.36,1.38),win,-i*5.35,.16,0)}
+ add(tr,CY(.02,.68,1.5,4),wh,3.25,0,0).rotation.set(Math.PI/4,0,-Math.PI/2);const hl=halo(tr,0xffffff,1.8,4.1,0,0,0);
+ tr.position.set(-9,9,-16);W.add(tr);lamp({t:1,em:[[win,1.6,0]],op:[[hl.material,.9]]});
+ anims.push((tm,dt)=>{if(PW.lv>=.999){tr.position.x+=dt*9;if(tr.position.x>75)tr.position.x=-75}});
+ /* 주변 : 광고판 · 스카이라인 · 나무(복구 단계마다 벚꽃) · 가로등 · 경보등 · 쓰레기 */
+ billboard(W,150,15,6.2,4.6,2.3,['TOXIC ALERT','수질 위험 · 접근 금지'],['ONCHEON STREAM','수질 정상 · 산책로 개방'],.8);
+ skyline(W,18,30,58,10,36,13);
+ [-22,-16.5,-11,-5.5,0,5.5,11,16.5,22].forEach((x,i)=>bareTree(W,x,-13,1+(i%3)*.15,[.2,.4,.6,.8,1][i%5],pk));
+ [[-13,6],[-8,8.5],[9.5,6.5],[16,5]].forEach((q,i)=>bareTree(W,q[0],q[1],1.1,[.6,.8,1,.4][i],pk));
+ [[-17,-4,.2],[-9,-4,.4],[9,-4,.6],[17,-4,.8],[-11,4.5,1],[7,5,.6]].forEach(q=>{const a=polar(q[0],q[1]);streetLamp(W,a[0],a[1],q[2])});
+ [[-13,-3.8],[13,-3.8]].forEach(q=>{const a=polar(q[0],q[1]);pole(W,a[0],a[1],3.2,1)});
+ debris(16,3,9,.8);debris(10,3,9,1);dust(230,0xa0a67c,44,15,false);dust(100,0x3df5c4,40,13,true);
+ {const n=110,pos=new Float32Array(n*3),geo=new THREE.BufferGeometry(),m=new THREE.PointsMaterial({color:0xffb6d3,size:.1,transparent:true,opacity:0,depthWrite:false});   // 벚꽃잎 (40%부터)
+  for(let i=0;i<n*3;i+=3){pos[i]=(Math.random()-.5)*36;pos[i+1]=Math.random()*7;pos[i+2]=(Math.random()-.5)*36}
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));W.add(new THREE.Points(geo,m));
+  anims.push((tm,dt)=>{m.opacity=clamp((PW.lv-.3)*3,0,.9);if(!m.opacity)return;for(let i=0;i<n*3;i+=3){pos[i+1]-=dt*.55;pos[i]+=Math.sin(tm+i)*dt*.3;if(pos[i+1]<0)pos[i+1]+=7}geo.attributes.position.needsUpdate=true})}
+ /* 쓰레기를 지나치는 사람들 → 완전 복구되면 하천을 정리하는 자원봉사자 */
+ person(W,{path:[-14,-1.6,14,-1.9],v:1,t:.4});person(W,{path:[12,2.4,-12,2.8],v:.9,t:.6});person(W,{path:[-18,-11,18,-11.4],v:1.1,t:.6});person(W,{path:[16,-11.6,-16,-11],v:.9,t:1});
+ const vol=new THREE.Group();W.add(vol);lamp({t:1,vis:[vol]});
+ [[-7,-3.3,Math.PI],[11,-3.4,Math.PI],[-3,-10.25,0]].forEach((q,i)=>{const v=person(vol,{still:true,t:1,col:i===1?0xffb340:0x3df5c4,pos:q});
+  add(v.g,B(.3,.4,.22),0x2f6b3e,.32,.7,.1);add(v.g,B(.03,.9,.03),0x9aa1ab,-.3,.62,.22).rotation.x=.5});
+
+ /* ① 물가의 돌 : 돌에 박힌 고장 난 단말기 → 1365 신청 화면 홀로그램 */
+ {const g=new THREE.Group(),sc=neon(0xff3d5a,0x0d1014),t1=panelTex('1365 VOLUNTEER',['활동 내용 확인','일시 · 장소 확인','신청하기 ▶'],'#3df5c4'),t2=panelTex('APPLIED · 신청 완료',['환경정화 활동','신청 인원 24명','기록 복구 ✓'],'#3df5c4'),hm=hmap(t1,0),RK={g,sc,hm,on:false};
+  add(g,new THREE.DodecahedronGeometry(.85),0x7c7f80,0,.5,0).scale.set(1.25,.75,1);add(g,B(.52,.3,.06),sc,0,.72,.84).rotation.x=-.35;
+  for(let k=0;k<5;k++)add(g,IC(.2),0x6f7273,-1.1+k*.55,.06,-1.4-(k%2)*.35);                       // 물길을 정리한 돌
+  RK.pn=add(g,new THREE.PlaneGeometry(1.7,.85),hm,0,1.85,.25);RK.pn.visible=false;lamp({t:.2,fn:k=>{hm.map=k>.5?t2:t1}});
+  anims.push(()=>{if(!RK.on)sc.emissiveIntensity=Math.random()<.12?.1:1.1});R.rock=RK;addObj(D[0],g,-12,5,0,2.6)}
+ /* ② 오래된 나무 : 관리 기록 홀로그램 → 해독하면 벚꽃이 핀다 */
+ {const g=new THREE.Group(),T=bareTree(g,0,0,1.5,0,pk);
+  add(g,new THREE.PlaneGeometry(1.4,.7),hmap(panelTex('CARE LOG · 관리 기록',['식재 2031.04','물 주기 · 주변 정리 ✓','상태 확인 ✓'],'#ffb340'),.8),0,1.5,.6);
+  R.tree={g,bl:T.bl};addObj(D[1],g,62,6.5,0,4.6)}
+ /* ③ 떠 있는 배 : 정화 활동 도구 + 깨진 안내지도 화면 */
+ {const g=new THREE.Group(),mp=neon(0xff3d5a,0x0d1014),BT={g,mp,on:false};
+  add(g,B(2.4,.45,1),0xd86f35,0,.2,0);add(g,B(2.5,.1,1.1),0xe9e2d0,0,.46,0);add(g,B(.8,.5,.7),0xdfe5ea,-.5,.76,0);add(g,B(.66,.38,.04),mp,-.5,.8,.37);
+  add(g,B(.04,1.6,.04),0x8a8f98,.6,1.25,.2).rotation.z=-.35;add(g,new THREE.TorusGeometry(.18,.025,4,12),0x8a8f98,.9,1.98,.2).rotation.y=Math.PI/2;add(g,CY(.2,.17,.4,8),0x2e7dd6,.55,.71,-.25);
+  anims.push(tm=>{g.position.y=Math.sin(tm*1.6)*.05;g.rotation.z=Math.sin(tm*1.2)*.04;if(!BT.on)mp.emissiveIntensity=Math.random()<.15?.1:1});R.boat=BT;addObj(D[2],g,-35,8.2,0,2.4)}
+ /* ④ 풍선 : 쓰레기 더미 + 「자원봉사 박람회」 현수막 + 바람 빠진 풍선 */
+ {const g=new THREE.Group(),pile=new THREE.Group(),bal=new THREE.Group(),BL={g,pile,bal,bm:[]};g.add(pile);g.add(bal);
+  const bt=canvasTex(256,64,(x,w,h)=>{x.fillStyle='#e8e2d2';x.fillRect(0,0,w,h);x.fillStyle='#2e7dd6';x.fillRect(0,0,w,9);x.fillStyle='#223';x.textAlign='center';x.textBaseline='middle';
+   x.font='900 24px '+FONT_KR;x.fillText('자원봉사 박람회',w/2,30,w-20);x.font='700 13px '+FONT_KR;x.fillText('동래구자원봉사센터',w/2,52,w-20)});
+  add(pile,new THREE.PlaneGeometry(1.8,.45),new THREE.MeshBasicMaterial({map:bt,side:THREE.DoubleSide,color:0xaaaaaa}),-.1,.3,.55).rotation.set(-1.1,0,.12);
+  [[.3,.2,-.1,0],[-.5,.1,.1,1],[.7,.1,.3,1],[-.1,.28,-.3,2],[.9,.15,-.4,0],[-.8,.15,-.3,3]].forEach(q=>{const k=q[3];
+   add(pile,k===1?CY(.08,.08,.32,7):k===2?IC(.28):B(.4,.3,.35),[0x9fd3e8,0x7fb7d6,0x6b6f75,0xb98a5a][k],q[0],q[1],q[2]).rotation.set(k===1?Math.PI/2:0,q[0]*3,0)});
+  [[-.35,0xff5c5c],[.05,0x5cb8ff],[.42,0xffd95c]].forEach((q,i)=>{const m=mat(0x8a8e96,{roughness:.4});BL.bm.push([m,q[1]]);
+   add(bal,SP(.32,10),m,q[0],1.4+i*.2,-.2).scale.y=1.15;add(bal,CY(.008,.008,1.3,3),0xd0d0d0,q[0]*.6,.75+i*.1,-.15)});
+  bal.rotation.z=.35;bal.position.y=-.4;anims.push(tm=>{bal.rotation.x=Math.sin(tm*1.1)*.05});R.balloon=BL;addObj(D[3],g,140,6,0,2.4)}
+ /* ⑤ 구름 위 헤드폰 : 손상된 음성도서 단말기 (구름은 복구율만큼 하얘진다) */
+ {const g=new THREE.Group(),cw=mat(0x8a8e96,{roughness:.95}),led=neon(0xff3d5a,0x22262e),CL={g,led,on:false},k0=new THREE.Color(0x7d828c),k1=new THREE.Color(0xf4f6f8);
+  [[0,0,0,1.2],[1.1,-.2,0,.9],[-1.1,-.2,0,.9],[.5,.4,.2,.8],[-.4,.35,-.3,.75]].forEach(q=>add(g,SP(q[3],8),cw,q[0],q[1],q[2]));
+  add(g,new THREE.TorusGeometry(.5,.07,6,16,Math.PI),0x2a2a2a,0,-.05,1.2);add(g,B(.26,.36,.22),0x7a5cff,-.5,-.15,1.18);add(g,B(.26,.36,.22),0x7a5cff,.5,-.15,1.18);add(g,B(.08,.08,.05),led,.5,-.05,1.31);
+  anims.push(tm=>{g.position.y=5.2+Math.sin(tm*.8)*.15;cw.color.copy(k0).lerp(k1,PW.lv);if(!CL.on)led.emissiveIntensity=Math.sin(tm*5)>0?1.3:.1});R.cloud=CL;addObj(D[4],g,220,8,5.2,1.6)}
+ unfog();view(-15,.03)};
+
+/* ================= 연출 : 챕터 3 ================= */
+FX.term=()=>{SFX.item();const k=R.rock;if(!GL||!k)return;k.on=true;k.sc.emissive.setHex(0x3df5c4);k.sc.emissiveIntensity=1.3;k.pn.visible=true;
+ tween(.6,e=>{const s=Math.max(.01,e);k.pn.scale.set(s,s,1);k.hm.opacity=.92*e});burst(k.g,0x3df5c4,20,0,.9,.8,1.2,1)};
+FX.bloom=()=>{SFX.item();const t=R.tree;if(!GL||!t)return;const cs=t.bl.children;t.bl.visible=true;cs.forEach(c=>c.scale.setScalar(.01));
+ tween(1.6,e=>{cs.forEach(c=>c.scale.setScalar(.01+.99*e))});burst(t.g,0xffb6d3,44,0,5,0,2.6,1.2,2.4)};
+FX.actmap=()=>{SFX.item();const b=R.boat;if(!GL||!b)return;b.on=true;b.mp.emissive.setHex(0x3df5c4);b.mp.emissiveIntensity=1.2;
+ const c=wpos(b.g,0,0,0),sc=world,rg=add(world,new THREE.RingGeometry(2.1,2.22,48),hf(0x3df5c4,.6),c.x,.12,c.z);rg.rotation.x=-Math.PI/2;
+ ['환경','복지','문화','재난','안전','교육'].forEach((n,i)=>setTimeout(()=>{if(world!==sc)return;const a=i/6*6.283+.3;
+  addTag('0'+(i+1),n,new THREE.Vector3(c.x+Math.cos(a)*2.2,1.3+(i%2)*.5,c.z+Math.sin(a)*2.2),'',12000);SFX.tick()},200+i*180))};
+FX.clean=()=>{SFX.power();const b=R.balloon;if(!GL||!b)return;
+ tween(1.2,e=>{b.pile.scale.setScalar(Math.max(.001,1-e));if(e>=1)b.pile.visible=false});b.bm.forEach(q=>q[0].color.setHex(q[1]));
+ tween(1.8,e=>{b.bal.rotation.z=.35*(1-e);b.bal.position.y=-.4+.8*e});burst(b.g,0x3df5c4,36,0,.5,0,2.6,1.6);wave(world,0x66ccff,-2,.12,-7,true,14,2.2)};
+FX.cloudOn=()=>{tone(520,.45,'sine',.12);tone(780,.55,'sine',.08,.15);const c=R.cloud;if(!GL||!c)return;c.on=true;c.led.emissive.setHex(0xc39bff);c.led.emissiveIntensity=1.6;
+ const sc=world;for(let i=0;i<3;i++)setTimeout(()=>{if(world===sc)wave(c.g,0xc39bff,0,-.1,1.3,false,6,1.6)},i*450)};
+FX.archive=()=>{glitch();SFX.power();showRec('ARCHIVE RECOVERY · 기록 대량 복구');setTimeout(hideRec,7000);if(!GL)return;
+ const sc=world,d0=-yaw/DEG,L=['환경정화 활동','취약계층 지원','장애인 지원','재난복구','문화행사 지원','안전 활동','교육 활동'];
+ L.forEach((n,i)=>setTimeout(()=>{if(world!==sc)return;const a=(d0+(i-3)*17)*DEG,r=7+(i%2);addTag('REC',n,new THREE.Vector3(Math.sin(a)*r,2.4+(i%3)*.7,-Math.cos(a)*r),'',15000);SFX.tick()},150+i*170));
+ const rm=hf(0x3df5c4,.7),rg=add(world,new THREE.RingGeometry(8.6,9,64),rm,0,.1,0);rg.rotation.x=-Math.PI/2;
+ tween(2.6,e=>{rg.position.y=.1+6*e;rm.opacity=.7*(1-e);if(e>=1)rg.visible=false});
+ burst(world,0x3df5c4,60,Math.sin(d0*DEG)*4,1.5,-Math.cos(d0*DEG)*4,6,2.2,2.4);tpitch=.12};
+</script>
+
+<script>
+'use strict';
+/* ===== PART 4-C-1 : 동래구자원봉사센터 — 원형 아카이브 홀 · 챕터 4 연출 ===== */
+(function(){try{if(document.fonts&&document.fonts.load)['700 32px "Noto Sans KR"','900 32px "Noto Sans KR"'].forEach(f=>document.fonts.load(f,'시스템정지활동처교육안전배치기록관리넘어짐담당자즉시보고응급처치완료장갑착용도구사용법비상연락처확인필수약속서한시간에참여하고맡은역할을끝까지다하겠습니다서명환경정화급식지원재난복구어르신동행봉사행사①②③●→').catch(()=>0))}catch(e){}})();
+
+function photoTex(){return canvasTex(512,256,(x,w,h)=>{x.fillStyle='#1b1f27';x.fillRect(0,0,w,h);   // 함께한 활동사진 6장
+ const C=['#3df5c4','#ffb340','#66ccff','#ff8a5c','#c39bff','#9ccc65'],N=['환경정화','급식 지원','재난 복구','어르신 동행','교육 봉사','행사 지원'];
+ for(let i=0;i<6;i++){const px=18+(i%3)*166,py=i>2?136:14;x.fillStyle='#f3efe4';x.fillRect(px,py,144,108);x.fillStyle=['#8fc7e8','#a8d5a2','#f2c38b'][i%3];x.fillRect(px+7,py+7,130,70);
+  for(let k=0;k<3;k++){const cx=px+34+k*38;x.fillStyle=C[(i+k)%6];x.beginPath();x.arc(cx,py+30,10,0,7);x.fill();x.fillRect(cx-11,py+42,22,35)}
+  x.fillStyle='#2b2b2b';x.font='700 15px '+FONT_KR;x.fillText(N[i],px+9,py+98,128)}})}
+
+SCN[3]=function(){resetWorld(PAL.center);const W=world,D=CH[3].objs,RW=12.6;
+ /* 원형 홀 : 바닥 LED 링 · 벽 · 가운데가 뚫린 천장(천창) · 벽 상단 상태 표시줄 */
+ add(W,CY(13,13,.2,40),0x262a32,0,-.1,0);
+ const fr=neon(0x3df5c4);add(W,new THREE.RingGeometry(6.8,7,64),fr,0,.012,0).rotation.x=-Math.PI/2;lamp({t:.4,em:[[fr,1.4,0]]});
+ add(W,new THREE.CylinderGeometry(RW,RW,7.2,48,1,true),mat(0x363b46,{side:THREE.BackSide}),0,3.6,0);
+ add(W,new THREE.RingGeometry(4.2,RW+.2,48),mat(0x1f2229,{side:THREE.DoubleSide}),0,7.2,0).rotation.x=Math.PI/2;
+ const sb=hf(0xff3d5a,.6);add(W,new THREE.TorusGeometry(RW-.12,.05,3,96),sb,0,6.75,0).rotation.x=Math.PI/2;
+ anims.push(tm=>{const on=PW.lv>=.6-1e-4;sb.color.setHex(on?0x3df5c4:0xff3d5a);sb.opacity=on?.7:(Math.sin(tm*4)>0?.75:.12)});
+ /* 서버 랙 : 복구 단계마다 민트 LED 점등, 붉은 LED 소등 (89°·106°는 무너진 위험 구역) */
+ const rk=mat(0x1c2027),lr=neon(0xff3d5a,0x101318),gR=B(1.5,4.4,1.1),gL=B(1.1,.06,.02),lm=[.2,.4,.6,.8,1].map(t=>{const m=neon(0x3df5c4,0x101318);lamp({t,em:[[m,1.6,0]]});return m});
+ [55,72,89,106,123,140,157,174,191,208,225,276,293,310].forEach((d,i)=>{const g=new THREE.Group(),c=new THREE.Group();g.add(c);add(c,gR,rk,0,2.2,0);
+  for(let k=0;k<6;k++)add(c,gL,k%2?lm[i%5]:lr,0,.9+k*.6,.56);if(d===89||d===106){c.rotation.set(.45,0,d===89?.1:-.1);c.position.z=.4}W.add(at(g,d,11.9))});
+ anims.push(tm=>{lr.emissiveIntensity=(1-PW.lv)*(Math.sin(tm*6)>0?1.3:.15)});
+ /* 천장 조명 12개(FX.lights에서 하나씩 점등) · 붉은 비상등 4개(안전 복구 60%에서 백색으로) */
+ const cp=[];for(let i=0;i<12;i++){const a=(i*30+15)*DEG,x=Math.sin(a)*8.4,z=-Math.cos(a)*8.4,m=mat(0x4a4e58,{emissive:0xfff3dd,emissiveIntensity:0});
+  add(W,B(2.2,.1,.8),m,x,7.12,z).rotation.y=-a;cp.push({m,h:halo(W,0xfff1dc,3.4,x,6.85,z,0)})}R.cp=cp;
+ [45,135,225,315].forEach(d=>{const q=wxz(d,12.15);add(W,B(.4,.3,.3),0x2a2f38,q[0],6.3,q[1]);beacon(W,q[0],6.3,q[1],.6,0xdff6ff)});
+ /* 천창 아래 깨진 아카이브 링 : 완전 복구되면 고리가 이어져 회전하고 빛기둥이 솟는다 */
+ const ar=new THREE.Group(),rm=hf(0xff3d5a,.5),fm=hf(0x3df5c4,0),cm=hf(0x3df5c4,.1),sh=new THREE.Group();ar.position.y=6;W.add(ar);ar.add(sh);
+ const ri=[[3.5,1.4],[2.7,1.55],[1.9,1.2]].map((q,i)=>{const g=new THREE.Group();g.rotation.set(Math.PI/2+(i-1)*.28,(i-1)*.2,0);ar.add(g);
+  add(g,new THREE.TorusGeometry(q[0],.07,6,64,Math.PI*q[1]),rm).rotation.z=i*2;add(g,new THREE.TorusGeometry(q[0],.05,6,64),fm);return g});
+ const core=add(ar,IC(.55,1),cm);for(let k=0;k<18;k++){const a=k/18*6.283,r=1.2+Math.random()*2.6;add(sh,B(.14,.14,.14),cm,Math.cos(a)*r,(Math.random()-.5)*1.6,Math.sin(a)*r).rotation.set(k,k*2,0)}
+ const bm=hf(0x3df5c4,0);add(W,new THREE.CylinderGeometry(.6,1.6,40,12,1,true),bm,0,27,0);lamp({t:1,op:[[bm,.16]]});
+ anims.push((tm,dt)=>{const on=PW.lv>=.999;rm.color.setHex(on?0x3df5c4:0xff3d5a);rm.opacity=on?.85:(Math.random()<.07?.05:.45);fm.opacity+=((on?.5:0)-fm.opacity)*Math.min(1,dt*2);
+  cm.opacity=.1+.6*PW.lv;core.rotation.y=tm*.6;sh.rotation.y=tm*(.05+.4*PW.lv);if(on)ri.forEach((g,i)=>{g.rotation.z+=dt*(.4+i*.25)*(i%2?-1:1)})});R.ring=ar;
+ /* 정면 상황판 6개 : NO SIGNAL → FX.screens에서 하나씩 켜짐 */
+ const off=panelTex('NO SIGNAL',['시스템 정지','DATA LINK LOST'],'#ff3d5a'),scr=[];
+ [['활동처','MATCHING'],['교육','TRAINING'],['안전','SAFETY'],['배치','PLACEMENT'],['기록','RECORDS'],['관리','MANAGEMENT']].forEach((q,i)=>{const g=new THREE.Group(),y=i<3?4.15:2.35,m=hmap(off,.45);
+  add(g,B(2.6,1.6,.1),0x14171d,0,y,-.08);add(g,new THREE.PlaneGeometry(2.4,1.4),m,0,y,0);W.add(at(g,-33+(i%3)*13,12.1));scr.push({m,on:panelTex(q[1],[q[0],'● ONLINE'],'#3df5c4'),lit:false})});
+ R.scr=scr;anims.push(tm=>{scr.forEach((s,i)=>{if(!s.lit)s.m.opacity=Math.random()<.08?.1:.4+.06*Math.sin(tm*9+i)})});
+ /* 활동사진 벽 : 완전 복구되면 색을 되찾는다 */
+ {const g=new THREE.Group(),pm=new THREE.MeshBasicMaterial({map:photoTex(),color:0x555555});add(g,B(4.3,2.4,.1),0x14171d,0,2.6,-.08);add(g,new THREE.PlaneGeometry(4,2),pm,0,2.6,0);
+  lamp({t:1,fn:k=>{pm.color.setScalar(.33+.67*k)}});W.add(at(g,250,12.1))}
+ /* 오가는 직원 · 완전 복구되면 나타나는 자원봉사자 */
+ person(W,{path:[-6,-2,6,-3],v:.9,t:.4});person(W,{path:[-5,3,5.5,1.8],v:1,t:.8});
+ const vol=new THREE.Group();W.add(vol);lamp({t:1,vis:[vol]});
+ [[-36,5],[215,4.6]].forEach(q=>{const p=wxz(q[0],q[1]);person(vol,{still:true,t:1,col:0x3df5c4,pos:[p[0],p[1],-q[0]*DEG]})});
+
+ /* ① 사고보고서 : 책상 위 보고서 + 붉게 깜빡이는 태블릿 */
+ {const g=new THREE.Group(),tb=neon(0xff3d5a,0x0d1014);add(g,B(1.9,.1,1),0x4a505c,0,.9,0);
+  [[-.85,-.4],[.85,-.4],[-.85,.4],[.85,.4]].forEach(q=>add(g,B(.07,.9,.07),0x2a2f38,q[0],.45,q[1]));
+  add(g,B(.5,.02,.68),0xf3efe4,-.35,.96,.05).rotation.y=.15;add(g,B(.4,.012,.07),0xd1495b,-.35,.975,-.2).rotation.y=.15;add(g,B(.62,.42,.04),tb,.45,1.17,-.22).rotation.x=-.35;
+  add(g,new THREE.PlaneGeometry(1.5,.75),hmap(panelTex('ACCIDENT REPORT',['넘어짐 → 담당자 즉시 보고','응급처치 완료 ✓'],'#ff3d5a'),.85),0,1.8,.1);
+  anims.push(tm=>{const on=PW.lv>=.2-1e-4;tb.emissive.setHex(on?0x3df5c4:0xff3d5a);tb.emissiveIntensity=on?1.2:(Math.sin(tm*5)>0?1.3:.15)});addObj(D[0],g,-20,5,0,2.4)}
+ /* ② 안전교육 자료 : 벽면 홀로그램 교육판 */
+ {const g=new THREE.Group(),fl=neon(0xffb340);add(g,B(3.3,1.75,.1),0x14171d,0,2.75,-.08);
+  add(g,new THREE.PlaneGeometry(3.1,1.55),hmap(panelTex('SAFETY TRAINING',['① 장갑 착용','② 도구 사용법','③ 비상 연락처'],'#ffb340'),.9),0,2.75,0);
+  add(g,B(3.3,.06,.06),fl,0,1.82,.04);lamp({t:.4,em:[[fl,1.5,0]]});addObj(D[1],g,35,12,0,3.95)}
+ /* ③ 경고 표시 : 무너진 위험 구역 앞 표지판 → 안전 시스템이 켜지면 민트빛 보호 펜스 */
+ {const g=new THREE.Group(),ym=mat(0xffc93c,{emissive:0x664400,emissiveIntensity:.3}),tp=new THREE.MeshStandardMaterial({map:stripeTex(),roughness:.7}),fz=hf(0x3df5c4,0);
+  add(g,CY(.05,.05,1.4,6),0x666b74,0,.7,0);add(g,CY(.35,.4,.1,10),0x333840,0,.05,0);add(g,CY(.72,.72,.08,3),ym,0,1.75,0).rotation.set(Math.PI/2,Math.PI,0);
+  add(g,B(.1,.38,.1),0x1b1b1b,0,1.8,.06);add(g,B(.1,.1,.1),0x1b1b1b,0,1.48,.06);
+  [-1.6,1.6].forEach(x=>add(g,CY(.06,.08,1.1,6),0x2b2f36,x,.55,-.9));add(g,B(3.2,.16,.02),tp,0,.95,-.9);
+  for(let k=0;k<6;k++)add(g,k%2?B(.9,.25,.5):IC(.35),k%2?0x4a505c:0x5d6670,(k-2.5)*.6,.15,-2-(k%3)*.5).rotation.set(k,k*1.3,0);
+  add(g,B(3.6,.35,.35),0x30353f,.3,1.3,-2.4).rotation.z=.5;
+  const sp=halo(g,0xffc060,.9,-.9,1.9,-2.2,0);anims.push(()=>{sp.material.opacity=PW.lv<.6&&Math.random()<.15?.95:0});
+  add(g,new THREE.PlaneGeometry(3.4,1.6),fz,0,.8,-1.05);lamp({t:.6,op:[[fz,.28]]});R.sign={g};addObj(D[2],g,95,6,0,2.6)}
+ /* ④ 공구함 : 작업대 위 빨간 공구함 + 확인 메모 */
+ {const g=new THREE.Group();add(g,B(1.7,.08,.85),0x5a6070,0,.85,0);[[-.75,-.35],[.75,-.35],[-.75,.35],[.75,.35]].forEach(q=>add(g,B(.07,.85,.07),0x2a2f38,q[0],.42,q[1]));
+  add(g,B(1,.42,.48),0xc0392b,0,1.1,0);add(g,B(.5,.07,.07),0x1b1b1b,0,1.42,0);add(g,B(.06,.12,.06),0x1b1b1b,-.22,1.36,0);add(g,B(.06,.12,.06),0x1b1b1b,.22,1.36,0);
+  add(g,B(.75,.05,.1),0x9aa1ab,.3,.92,.25).rotation.y=.5;add(g,CY(.04,.04,.6,6),0xffb340,-.45,.92,.22).rotation.z=Math.PI/2;
+  add(g,new THREE.PlaneGeometry(1.1,.55),hmap(panelTex('CHECK',['사용 전','담당자 확인 필수'],'#ffb340'),.85),0,1.85,.15);addObj(D[3],g,150,5,0,2.3)}
+ /* ⑤ 활동 약속서 : 받침대 위 홀로그램 약속서 (복구 80%부터 빛나며 다음 목표를 알려준다) */
+ {const g=new THREE.Group(),pr=neon(0x3df5c4,0x2a2f38),pm=hmap(panelTex('PLEDGE · 활동 약속서',['약속한 시간에 참여하고','맡은 역할을 끝까지 다하겠습니다','서명 312명 ✓'],'#3df5c4'),.35);
+  add(g,CY(.45,.62,1,8),0x5c6170,0,.5,0);add(g,CY(.5,.5,.05,24),pr,0,1.02,0);add(g,B(.7,.02,.9),0xefe6cf,0,1.06,0).rotation.x=-.2;
+  const pp=add(g,new THREE.PlaneGeometry(1.6,.8),pm,0,1.85,0);lamp({t:.8,em:[[pr,1.4,.15]],fn:k=>{pm.opacity=.35+.6*k}});
+  anims.push(tm=>{pp.position.y=1.85+Math.sin(tm*1.3)*.05});addObj(D[4],g,200,4,0,2.6)}
+ dust(150,0x9a8a90,24,7,false);dust(70,0x3df5c4,22,7,true);unfog();view(-20,.4)};
+
+/* ================= 연출 : 챕터 4 ================= */
+FX.screens=()=>{SFX.power();const s=R.scr;if(!GL||!s)return;const sc=world;tpitch=.12;
+ s.forEach((x,i)=>setTimeout(()=>{if(world!==sc)return;x.lit=true;x.m.map=x.on;x.m.opacity=.95;SFX.tick()},250+i*230))};
+FX.lights=()=>{const c=R.cp;if(!GL||!c)return;const sc=world;tpitch=.3;
+ c.forEach((p,i)=>setTimeout(()=>{if(world!==sc)return;SFX.tick();tween(.45,e=>{const k=e<.8&&Math.random()<.5?.08:1;p.m.emissiveIntensity=1.3*k;p.h.material.opacity=.5*k})},i*150))};
+FX.safety=()=>{SFX.power();const s=R.sign;if(!GL||!s)return;addTag('SAFETY','SYSTEM ONLINE',wpos(s.g,0,1.75,-1.05),'',8000);wave(s.g,0x3df5c4,0,.1,-1,true,5,1.6);burst(s.g,0x3df5c4,26,0,1.2,-1,2,1.2)};
+FX.codeInput=()=>{setBusy(true);openCode();if(GL&&R.ring){tpitch=.55;burst(R.ring,0x3df5c4,50,0,0,0,4,1,2.2)}return 'wait'};
+</script>
+
+<script>
+'use strict';
+/* ===== PART 4-C-2 : 3단계 검수 패치 (앞 PART를 직접 고치지 않고 여기서 바로잡음) · 실행 ===== */
+(function(){
+ /* 1) 시간 초과와 정답 처리가 겹쳐도 실패 화면 뒤에서 대사·챕터가 이어지지 않게 */
+ const run0=run;run=function(l,d){if(!S.over)run0(l,d)};
+ /* 2) 프롤로그 과거 영상 중 달린 열차가 현재로 돌아오면 끊어진 구간 앞 정거장으로 복귀 */
+ train=function(p,r,y,start){const wh=mat(0xcfd6e0,{roughness:.4,metalness:.3}),win=neon(0x9fdcff,0x16202b),cars=[],dA=5.35/r/DEG;let hl=null,ph=start;
+  for(let i=0;i<3;i++){const g=new THREE.Group();add(g,B(5,1.15,1.35),wh);add(g,B(4.6,.36,1.38),win,0,.16,0);
+   if(!i){add(g,new THREE.CylinderGeometry(.02,.68,1.5,4,1),wh,3.25,0,0).rotation.set(Math.PI/4,0,-Math.PI/2);hl=halo(g,0xffffff,1.8,4,0,0,0)}p.add(g);cars.push(g)}
+  lamp({t:1,em:[[win,1.6,0]],op:[[hl.material,.9]]});
+  anims.push((tm,dt)=>{ph=PW.lv>=.999?ph+dt*11:start;for(let i=0;i<3;i++)at(cars[i],ph-i*dA,r,y)});return cars};
+ /* 3) 과거 기록 영상 동안 '현재' 자원봉사자를 숨겨 홀로그램과 같은 자리에 겹치지 않게 (광장·시장) */
+ const helpers=on=>walkers.forEach(w=>{if(w.still&&(w.col===0x3df5c4||w.col===0xffb340))w.g.visible=on});
+ [['past','present'],['replay','replayOff']].forEach(k=>{const a=FX[k[0]],b=FX[k[1]];FX[k[0]]=x=>{a(x);helpers(false)};FX[k[1]]=x=>{b(x);helpers(true)}});
+ /* 4) 행인이 게시판·어르신·통제선·누각을 통과하거나 서로 겹치던 경로 재배치
+    5) 화면 위 HUD에 가려지던 이름표(깃발·나무·구름) 높이 조정 */
+ const WF={'-1':[[3,[-8.5,8.1,8.2,8.6]]],0:[['r',8.7]],1:[[1,[8,4.8,-8,3.6]],[3,[8.8,-6.5,9.2,5.5]]],2:[[3,[16,-12,-16,-11.9]]]},
+  LY={0:{0:3.9},2:{1:3.4,4:-.5}},bs0=buildScene;
+ buildScene=function(n){bs0(n);if(!GL)return;const pw=walkers.filter(w=>w.path);
+  (WF[n]||[]).forEach(f=>{if(f[0]==='r'){walkers.forEach(w=>{if(w.r){w.sp*=w.r/f[1];w.r=f[1]}});return}
+   const w=pw[f[0]],p=f[1];if(!w)return;const q=w.path,v=w.sp*Math.hypot(q[2]-q[0],q[3]-q[1]);w.path=p;w.sp=v/Math.hypot(p[2]-p[0],p[3]-p[1])});
+  const ly=LY[n]||{};Object.keys(ly).forEach(i=>{const o=objs[i];if(o&&o.g)o.g.userData.ly=ly[i]})};
+ /* 6) 휴대폰·가로 화면에서 문제 카드가 주소창 뒤로 잘리던 문제 */
+ const st=document.createElement('style');
+ st.textContent='.card{max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overscroll-behavior:contain;touch-action:pan-y}'+
+  '@media (max-width:720px),(max-height:600px){.ov{padding:10px}.card{padding:18px 16px 14px;max-height:calc(100vh - 20px);max-height:calc(100dvh - 20px)}'+
+  '.card h2{margin:6px 0 10px;font-size:17px}.opt{margin:6px 0;padding:10px 12px;min-height:44px;font-size:15px}.oxrow .opt{min-height:84px;font-size:38px}'+
+  '.qfoot{font-size:11px}#glyphs span{width:44px;height:44px;font-size:22px}}';
+ document.head.appendChild(st);
+})();
+boot();
+</script>
+</body>
+</html>
