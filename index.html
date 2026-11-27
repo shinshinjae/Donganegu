@@ -1801,7 +1801,7 @@ function bgStart(){if(BG.ok||BG.dead)return;try{auInit();const c=AU.ctx;if(!c)re
 'use strict';
 /* ===== PART 6 : 조사요원 ID 입력 · 참가 기록 전송 (관리자 페이지 연동) ===== */
 (function(){
-const SERVER_URL='https://script.google.com/a/macros/g.kmou.ac.kr/s/AKfycbzrh-W9T_82uOdn7gdiVMuJci9vp4ncWzoRWE2iXV1m9oniB0JMksqv15yeyRy0Cnw8Zg/exec';   // ★ Apps Script 웹 앱 주소(https://script.google.com/macros/s/…/exec)를 따옴표 안에 붙여넣기
+const SERVER_URL='https://script.google.com/macros/s/AKfycbzrh-W9T_82uOdn7gdiVMuJci9vp4ncWzoRWE2iXV1m9oniB0JMksqv15yeyRy0Cnw8Zg/exec';   // ★ Apps Script 웹 앱 주소(https://script.google.com/macros/s/…/exec)를 따옴표 안에 붙여넣기
 const ID_RE=/^[0-9A-Za-z가-힣][0-9A-Za-z가-힣_.\-]{1,29}$/,OB='dn-outbox',P={id:'',done:false},msgs=[];
 const st=(n,k,v)=>{try{const s=window[n];if(v===undefined)return s.getItem(k);s.setItem(k,v)}catch(e){return null}};
 let busy=false,wait=2000,fails=0;
