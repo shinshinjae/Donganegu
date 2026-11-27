@@ -1799,10 +1799,11 @@ function bgStart(){if(BG.ok||BG.dead)return;try{auInit();const c=AU.ctx;if(!c)re
 
 <script>
 'use strict';
-/* ===== PART 6 : 조사요원 ID 입력 · 참가 기록 전송 (관리자 페이지 연동) ===== */
+/* ===== PART 6 v2 : 조사요원 ID 입력 · 참가 기록 전송 (문제별 풀이 기록 포함) ===== */
 (function(){
 const SERVER_URL='https://script.google.com/macros/s/AKfycbzrh-W9T_82uOdn7gdiVMuJci9vp4ncWzoRWE2iXV1m9oniB0JMksqv15yeyRy0Cnw8Zg/exec';   // ★ Apps Script 웹 앱 주소(https://script.google.com/macros/s/…/exec)를 따옴표 안에 붙여넣기
 const ID_RE=/^[0-9A-Za-z가-힣][0-9A-Za-z가-힣_.\-]{1,29}$/,OB='dn-outbox',P={id:'',done:false},msgs=[];
+const Q=new Array(20).fill('.');   // 문제별 기록 : o 첫 시도 정답 · r 다시 풀어 정답 · x 아직 못 맞힘 · . 도달 전
 const st=(n,k,v)=>{try{const s=window[n];if(v===undefined)return s.getItem(k);s.setItem(k,v)}catch(e){return null}};
 let busy=false,wait=2000,fails=0;
 
@@ -1834,12 +1835,15 @@ document.addEventListener('click',e=>{const t=e.target;if(P.id||go.disabled||!t|
   form.classList.remove('shake');void form.offsetWidth;form.classList.add('shake');inp.focus();return}
  P.id=v;inp.disabled=true;st('sessionStorage','dn-id',v);send('start',{})},true);
 
-/* ---------- 게임 흐름에 기록 연결 : 시작 · 구역 완료 · 성공 · 실패 ---------- */
+/* ---------- 게임 흐름에 기록 연결 : 시작 · 문제 풀이 · 구역 완료 · 성공 · 실패 ---------- */
 const on0=FX.online;FX.online=function(){const r=on0.apply(this,arguments);$('agentTxt').textContent='LINK ONLINE · '+P.id;return r};
-const ec0=enterChapter;enterChapter=function(){if(P.id&&S.ch>0)send('prog',{solved:S.solved,wrong:S.wrong,zone:CH[S.ch-1].place+' 완료'});return ec0.apply(this,arguments)};
-const fail0=fail;fail=function(){const was=S.over,r=fail0.apply(this,arguments);if(!was&&P.id&&!P.done)send('fail',{solved:S.solved,wrong:S.wrong});return r};
+const ans0=answer;answer=function(k){const qi=S.solved,w=S.wrong,r=ans0.apply(this,arguments),b=$('qopts').children[k];
+ if(qi<20){if(S.wrong>w)Q[qi]='x';else if(b&&b.classList.contains('good')&&(Q[qi]==='.'||Q[qi]==='x'))Q[qi]=Q[qi]==='x'?'r':'o'}return r};
+const qs=()=>Q.join('');
+const ec0=enterChapter;enterChapter=function(){if(P.id&&S.ch>0)send('prog',{solved:S.solved,wrong:S.wrong,zone:CH[S.ch-1].place+' 완료',qs:qs()});return ec0.apply(this,arguments)};
+const fail0=fail;fail=function(){const was=S.over,r=fail0.apply(this,arguments);if(!was&&P.id&&!P.done)send('fail',{solved:S.solved,wrong:S.wrong,qs:qs()});return r};
 $('codeForm').addEventListener('submit',()=>{if(P.done||!P.id||!$('timer').classList.contains('stop'))return;P.done=true;
- send('done',{solved:S.solved,wrong:S.wrong,left:Math.round(S.time),used:Math.round(START_TIME-S.time)})});
+ send('done',{solved:S.solved,wrong:S.wrong,left:Math.round(S.time),used:Math.round(START_TIME-S.time),qs:qs()})});
 
 /* ---------- 전송 대기열 : 실패하면 자동 재전송 (창을 닫았다 다시 열어도 이어서 전송) ---------- */
 const obGet=()=>{try{return JSON.parse(st('localStorage',OB)||'[]')}catch(e){return []}},obSet=a=>st('localStorage',OB,JSON.stringify(a));
@@ -1860,7 +1864,7 @@ addEventListener('online',()=>{wait=2000;flush()});
 addEventListener('beforeunload',e=>{if(P.done&&SERVER_URL&&obGet().length){e.preventDefault();e.returnValue=''}});   // 완료 기록 전송 전 창 닫기 경고
 flush();
 })();
-</script> 
+</script>
  
 </body>
 </html>
