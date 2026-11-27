@@ -1796,6 +1796,71 @@ function bgStart(){if(BG.ok||BG.dead)return;try{auInit();const c=AU.ctx;if(!c)re
  BG.ok=true;BG.nt=c.currentTime+.1;setInterval(tick,50);tick()}catch(e){console.warn('BGM 비활성화',e);BG.dead=true}}
 })();
 </script>
+
+<script>
+'use strict';
+/* ===== PART 6 : 조사요원 ID 입력 · 참가 기록 전송 (관리자 페이지 연동) ===== */
+(function(){
+const SERVER_URL='https://script.google.com/a/macros/g.kmou.ac.kr/s/AKfycbzrh-W9T_82uOdn7gdiVMuJci9vp4ncWzoRWE2iXV1m9oniB0JMksqv15yeyRy0Cnw8Zg/exec';   // ★ Apps Script 웹 앱 주소(https://script.google.com/macros/s/…/exec)를 따옴표 안에 붙여넣기
+const ID_RE=/^[0-9A-Za-z가-힣][0-9A-Za-z가-힣_.\-]{1,29}$/,OB='dn-outbox',P={id:'',done:false},msgs=[];
+const st=(n,k,v)=>{try{const s=window[n];if(v===undefined)return s.getItem(k);s.setItem(k,v)}catch(e){return null}};
+let busy=false,wait=2000,fails=0;
+
+/* ---------- 화면 : 시작 화면 ID 입력칸 · 종료/실패 화면 기록 상태 ---------- */
+const css=document.createElement('style');
+css.textContent='#start{display:flex;overflow-y:auto;touch-action:pan-y}#start .in{margin:auto}'+
+ '#idBox{width:min(360px,100%);margin:0 auto 20px;text-align:left}#idBox label{display:block;margin-bottom:6px;color:var(--mint);font:700 12px var(--mono);letter-spacing:.14em}'+
+ '#agentId{width:100%;padding:13px 14px;border:1px solid rgba(150,215,255,.3);background:rgba(8,12,20,.88);color:#fff;font-size:18px;font-weight:700}'+
+ '#agentId:focus{outline:none;border-color:var(--mint);box-shadow:0 0 0 3px rgba(61,245,196,.25)}#agentId:disabled{opacity:.6}'+
+ '#idBox small{display:block;margin-top:6px;color:var(--sub);font-size:12px}#idErr{margin-top:2px}'+
+ '#agentTxt{display:inline-block;max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}'+
+ '#end .syncMsg,#fail .syncMsg{min-height:22px;color:var(--sub);font-size:14px}#end .syncMsg.ok,#fail .syncMsg.ok{color:var(--mint)}#end .syncMsg.err,#fail .syncMsg.err{color:var(--red)}'+
+ '.syncMsg button{margin-left:8px;padding:3px 12px;border:1px solid currentColor;background:none;color:inherit;cursor:pointer}'+
+ '@media (max-width:720px){#agentTxt{max-width:24vw}}';
+document.head.appendChild(css);
+const form=document.createElement('form'),go=$('go');form.id='idBox';form.noValidate=true;form.setAttribute('autocomplete','off');
+form.innerHTML='<label for="agentId">조사요원 ID</label><input id="agentId" maxlength="30" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="예: 참가번호 또는 닉네임"><small>한글·영문·숫자 2~30자 · 기호는 _ - . 만 쓸 수 있어요</small><div id="idErr" class="msg" role="alert"></div>';
+go.parentNode.insertBefore(form,go);
+const inp=$('agentId'),err=$('idErr');inp.value=st('sessionStorage','dn-id')||'';      // 같은 창에서 다시 할 때 자동 입력
+inp.addEventListener('input',()=>{err.textContent=''});
+inp.addEventListener('keydown',e=>e.stopPropagation());                             // 입력 중 방향키가 3D 화면을 돌리지 않게
+form.addEventListener('submit',e=>{e.preventDefault();if(!go.disabled)go.click()});
+[['endStat',1],['retry1',0]].forEach(q=>{const p=document.createElement('p'),ref=$(q[0]);p.className='syncMsg';p.setAttribute('aria-live','polite');
+ ref.parentNode.insertBefore(p,q[1]?ref.nextSibling:ref);msgs.push(p)});
+
+/* ---------- '조사 시작' : ID를 확인한 뒤에만 게임 시작 ---------- */
+document.addEventListener('click',e=>{const t=e.target;if(P.id||go.disabled||!t||!t.closest||!t.closest('#go'))return;const v=inp.value.trim();
+ if(!ID_RE.test(v)){e.stopPropagation();e.preventDefault();err.textContent=v?'한글·영문·숫자 2~30자로 입력해 주세요. (기호는 _ - . 만)':'조사요원 ID를 입력해 주세요.';
+  form.classList.remove('shake');void form.offsetWidth;form.classList.add('shake');inp.focus();return}
+ P.id=v;inp.disabled=true;st('sessionStorage','dn-id',v);send('start',{})},true);
+
+/* ---------- 게임 흐름에 기록 연결 : 시작 · 구역 완료 · 성공 · 실패 ---------- */
+const on0=FX.online;FX.online=function(){const r=on0.apply(this,arguments);$('agentTxt').textContent='LINK ONLINE · '+P.id;return r};
+const ec0=enterChapter;enterChapter=function(){if(P.id&&S.ch>0)send('prog',{solved:S.solved,wrong:S.wrong,zone:CH[S.ch-1].place+' 완료'});return ec0.apply(this,arguments)};
+const fail0=fail;fail=function(){const was=S.over,r=fail0.apply(this,arguments);if(!was&&P.id&&!P.done)send('fail',{solved:S.solved,wrong:S.wrong});return r};
+$('codeForm').addEventListener('submit',()=>{if(P.done||!P.id||!$('timer').classList.contains('stop'))return;P.done=true;
+ send('done',{solved:S.solved,wrong:S.wrong,left:Math.round(S.time),used:Math.round(START_TIME-S.time)})});
+
+/* ---------- 전송 대기열 : 실패하면 자동 재전송 (창을 닫았다 다시 열어도 이어서 전송) ---------- */
+const obGet=()=>{try{return JSON.parse(st('localStorage',OB)||'[]')}catch(e){return []}},obSet=a=>st('localStorage',OB,JSON.stringify(a));
+function send(ev,data){if(SERVER_URL&&P.id){const a=obGet();a.push(Object.assign({id:P.id,ev},data));obSet(a.slice(-40));flush()}syncUI()}
+async function flush(){if(busy||!SERVER_URL)return;busy=true;let again=false;
+ try{for(let a=obGet();a.length;a=obGet()){const r=await fetch(SERVER_URL,{method:'POST',body:JSON.stringify(a[0])}),j=await r.json();
+   if(!j.ok&&j.err!=='id'&&j.err!=='bad')throw new Error(j.err||'server');a=obGet();a.shift();obSet(a);fails=0;wait=2000}}
+ catch(e){fails++;again=true}
+ finally{busy=false;syncUI();if(again){setTimeout(flush,wait);wait=Math.min(wait*2,60000)}}}
+function syncUI(){if(!P.id)return;const n=obGet().length;let cls='',t,retry=false;
+ if(!SERVER_URL)t='기록 서버가 연결되지 않아 결과가 저장되지 않았어요.';
+ else if(!n){cls='ok';t=P.done?'✓ 완료 기록이 저장되었습니다.':'✓ 진행 기록이 저장되었습니다.'}
+ else if(fails){cls='err';t='⚠ 기록 전송 실패 · 인터넷 연결을 확인해 주세요.';retry=true}
+ else t='기록 전송 중…';
+ msgs.forEach(p=>{p.className='syncMsg '+cls;p.textContent='조사요원 '+P.id+' · '+t;
+  if(retry){const b=document.createElement('button');b.type='button';b.textContent='다시 시도';b.onclick=e=>{e.stopPropagation();wait=2000;flush()};p.appendChild(b)}})}
+addEventListener('online',()=>{wait=2000;flush()});
+addEventListener('beforeunload',e=>{if(P.done&&SERVER_URL&&obGet().length){e.preventDefault();e.returnValue=''}});   // 완료 기록 전송 전 창 닫기 경고
+flush();
+})();
+</script> 
  
 </body>
 </html>
